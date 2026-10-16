@@ -1,0 +1,827 @@
+<title>Recruiting Pipeline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: header + four top tabs (Overview, LinkedIn, Email, Applications); each tab is one working column. */
+:root{
+  --bg:#F4F6F8; --surface:#FFFFFF; --ink:#13203A; --muted:#5D6B82; --line:#DCE2EA; --soft:#EAEEF3;
+  --accent:#2B50C8; --accent-ink:#FFFFFF;
+  --s-prep:#8A94A6; --s-sent:#2B50C8; --s-test:#7A5AC8; --s-int:#C27A12; --s-good:#1E8A5A; --s-bad:#B8433A; --s-cold:#A3ADBD; --s-hv:#1A8A96; --bar-ink:#FFFFFF;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F1522; --surface:#171F30; --ink:#E6EBF3; --muted:#93A0B6; --line:#2A3449; --soft:#212A3D;
+  --accent:#7B9BFF; --accent-ink:#0F1522;
+  --s-prep:#7E889B; --s-sent:#7B9BFF; --s-test:#A98CF0; --s-int:#E3A245; --s-good:#4CC08A; --s-bad:#E77A70; --s-cold:#5F6B80; --s-hv:#4FC3CF; --bar-ink:#0F1522;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1522; --surface:#171F30; --ink:#E6EBF3; --muted:#93A0B6; --line:#2A3449; --soft:#212A3D;
+  --accent:#7B9BFF; --accent-ink:#0F1522;
+  --s-prep:#7E889B; --s-sent:#7B9BFF; --s-test:#A98CF0; --s-int:#E3A245; --s-good:#4CC08A; --s-bad:#E77A70; --s-cold:#5F6B80; --s-hv:#4FC3CF; --bar-ink:#0F1522;
+  color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5}
+.wrap{max-width:1120px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-stretch:80%;font-weight:800;font-size:clamp(30px,5vw,44px);line-height:1;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.save{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.save b{font-weight:500;color:var(--s-good)}
+.save.off b{color:var(--s-bad)}
+nav.top{display:flex;gap:2px;border-bottom:2px solid var(--ink);overflow-x:auto}
+.ttab{appearance:none;border:0;background:none;color:var(--muted);font:600 15px var(--body);padding:10px 14px;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;white-space:nowrap}
+.ttab:hover{color:var(--ink)}
+.ttab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.ttab span{font-family:var(--mono);font-weight:400;font-size:12px;margin-left:5px}
+.view{display:grid;gap:28px}
+h2.sec{font-family:var(--display);font-stretch:85%;font-size:17px;font-weight:700;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+h2.sec span{font-family:var(--body);font-size:12px;font-weight:400;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-bottom:1px solid var(--line)}
+.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.kpi{padding:14px 16px 16px 0;display:grid;gap:2px}
+.kpi+.kpi{padding-left:16px;border-left:1px solid var(--line)}
+.kpi .n{font-family:var(--display);font-stretch:85%;font-weight:700;font-size:34px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:12px;color:var(--muted)}
+@media (max-width:720px){.kpis,.kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi{border-left:0!important;padding-left:0!important;border-bottom:1px solid var(--line)}}
+.sources{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:820px){.sources{grid-template-columns:1fr}}
+.src{appearance:none;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:10px;cursor:pointer}
+.src:hover{border-color:var(--muted)}
+.src .h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.src .h strong{font-family:var(--display);font-stretch:85%;font-size:18px}
+.src .h span{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.src .big{font-family:var(--display);font-stretch:85%;font-weight:700;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.src .big small{font-family:var(--body);font-size:12px;font-weight:400;color:var(--muted);margin-left:6px}
+.src dl{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:0;font-size:13px}
+.src dt{color:var(--muted)}
+.src dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.src dd.warn{color:var(--s-int)}
+.bar{display:flex;height:14px;border-radius:3px;overflow:hidden;background:var(--soft)}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+.dot{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
+.funnels{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media (max-width:820px){.funnels{grid-template-columns:1fr}}
+.panel-box{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px}
+.nlist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
+.nlist li{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--soft);border-radius:4px;min-width:0}
+.nlist li div{min-width:0}
+.nlist li strong{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nlist li small{color:var(--muted);font-size:12px}
+.nlist .days{font-family:var(--mono);font-size:12px;color:var(--s-int);white-space:nowrap;align-self:center;text-align:right}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px}
+.empty-note{color:var(--muted);font-size:13px;margin:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.toolbar .l{display:flex;flex-wrap:wrap;gap:6px}
+.toolbar .r{display:flex;flex-wrap:wrap;gap:8px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:7px 9px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:500 13px var(--body);padding:7px 12px;border-radius:4px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.6;cursor:default}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--s-bad)}
+.chip{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);font:500 12px var(--body);padding:4px 10px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th{font-family:var(--mono);font-weight:500;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.who strong{display:block;font-weight:600}
+td.who small{color:var(--muted)}
+td.num{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.notes{color:var(--muted);font-size:13px;max-width:300px}
+.pill{position:relative;display:inline-flex;align-items:center}
+.pill select{appearance:none;-webkit-appearance:none;font:600 12px var(--body);padding:4px 24px 4px 22px;border-radius:999px;border:1px solid var(--line);background:var(--soft);cursor:pointer}
+.pill::before{content:"";position:absolute;left:9px;width:7px;height:7px;border-radius:50%;background:var(--c);pointer-events:none}
+.pill::after{content:"";position:absolute;right:10px;width:5px;height:5px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg) translateY(-2px);pointer-events:none}
+.rowbtn{appearance:none;border:0;background:none;color:var(--accent);font:500 12px var(--body);cursor:pointer;padding:0}
+.overdue{color:var(--s-int)}
+.blank{color:var(--muted)}
+.emptyrow td{text-align:center;color:var(--muted);padding:32px 12px}
+.tri-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+.tri-head h2{font-family:var(--display);font-stretch:85%;font-size:22px;font-weight:700;margin:0}
+.tri-meta{margin:2px 0 0;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.tri-note{margin:0;font-size:13px;padding:10px 12px;border-radius:4px;background:var(--soft)}
+.tri-note.err{color:var(--s-bad)}
+.tri-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.tri-group{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:6px;padding:14px;display:grid;gap:10px;align-content:start;min-width:0}
+.tri-group h3{margin:0;font-size:14px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.tri-group h3 span{font-family:var(--mono);font-weight:500;color:var(--muted)}
+.tri-group p.sub{margin:-6px 0 0;font-size:12px;color:var(--muted)}
+.tri-item{display:grid;gap:3px;padding-top:10px;border-top:1px solid var(--line);min-width:0}
+.tri-item .top{display:flex;justify-content:space-between;gap:8px;min-width:0}
+.tri-item strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tri-item .d{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.tri-item .firm{font-size:12px;color:var(--muted)}
+.tri-item .gist{font-size:13px}
+.tri-item .do{font-size:13px;background:var(--soft);padding:6px 8px;border-radius:4px}
+.draft{display:grid;gap:6px;border:1px dashed var(--line);border-radius:4px;padding:8px 10px;background:var(--bg)}
+.draft .dh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.draft .dh b{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.draft .subj{font-size:13px;font-weight:600}
+.draft pre{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 var(--body);color:var(--ink)}
+.copy{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--accent);font:500 12px var(--body);padding:2px 8px;border-radius:3px;cursor:pointer}
+.copy.ok{color:var(--s-good)}
+.prospects{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+@media (max-width:400px){.prospects{grid-template-columns:1fr}}
+.pc{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;display:grid;gap:10px;align-content:start;min-width:0}
+.pc .who strong{display:block;font-size:15px;font-weight:600}
+.pc .who span{font-size:12px;color:var(--muted)}
+.pc .why{font-size:13px}
+.pc .addr{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;word-break:break-all}
+.conf{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:3px;border:1px solid currentColor}
+.conf.high{color:var(--s-good)} .conf.medium{color:var(--s-int)} .conf.low{color:var(--s-bad)}
+.pc .src-l{font-size:12px;color:var(--muted)}
+.pc .src-l a{color:var(--accent)}
+.pc .acts{display:flex;flex-wrap:wrap;gap:6px}
+.pc .acts .btn{padding:5px 10px;font-size:12px}
+.tri-none{font-size:13px;color:var(--muted)}
+.tri-none summary{cursor:pointer}
+.sheet{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 35%,transparent);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;width:min(560px,100%);max-height:calc(100% - 32px);overflow:auto;padding:20px;display:grid;gap:14px}
+.panel h3{font-family:var(--display);font-stretch:85%;font-size:20px;margin:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}}
+label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+label.full{grid-column:1/-1}
+.panel .actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.panel .actions div{display:flex;gap:8px}
+.confirm{font-size:13px;color:var(--s-bad);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s ease}}
+
+/* compact density */
+table{font-size:13px}
+th{padding:7px 10px}
+td{padding:5px 10px;vertical-align:middle}
+td.who{white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis}
+td.who strong{display:inline;font-weight:600}
+td.who small{display:inline;margin-left:6px;font-size:12px}
+td.notes{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.pill select{font-size:11px;padding:2px 20px 2px 18px}
+.pill::before{left:8px;width:6px;height:6px}
+.pill::after{right:8px}
+.kpi{padding:8px 12px 10px 0}
+.kpi+.kpi{padding-left:12px}
+.kpi .n{font-size:26px}
+.view{gap:20px}
+.emptyrow td{padding:20px 10px}
+
+.fun{display:grid;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px}
+.fun .row{display:grid;grid-template-columns:96px 1fr 58px;align-items:center;gap:12px}
+.fun .lab{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fun .track{display:flex;justify-content:center;height:30px}
+.fun .bar{height:100%;min-width:76px;background:var(--c);border-radius:4px;display:flex;align-items:center;justify-content:center;
+  color:var(--bar-ink);font-family:var(--mono);font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 8px;
+  background-image:linear-gradient(to bottom,rgba(255,255,255,.14),rgba(0,0,0,.06))}
+.fun .bar small{font-size:11px;opacity:.85;margin-left:4px;font-weight:400}
+.fun .bar.zero{background:var(--soft);color:var(--muted);background-image:none}
+.fun .cv{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;white-space:nowrap}
+.fun .cv b{color:var(--ink);font-weight:500}
+.fun .foot{margin-top:8px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px}
+.fun .foot b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+@media (max-width:480px){.fun .row{grid-template-columns:76px 1fr 48px;gap:8px}.fun .bar{min-width:64px;font-size:12px}}
+
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+@media (max-width:640px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{appearance:none;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:4px;padding:6px 10px;display:flex;justify-content:space-between;align-items:baseline;gap:6px;cursor:pointer;text-align:left}
+.tile span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile b{font-family:var(--mono);font-size:16px;font-weight:600}
+.tile.on{background:var(--soft);border-color:var(--c)}
+.tile.on span{color:var(--ink)}
+.ilist{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ilist > .empty-note{padding:12px}
+.tri-groups{display:grid;gap:8px}
+.it{border-bottom:1px solid var(--line)}
+.it:last-child{border-bottom:0}
+.it summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:minmax(0,170px) minmax(0,150px) minmax(0,1fr) auto;align-items:center;gap:10px;padding:6px 12px;font-size:13px}
+.it summary::-webkit-details-marker{display:none}
+.it summary:hover{background:var(--soft)}
+.it[open] summary{background:var(--soft)}
+.it summary strong{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it summary .m,.it summary .g{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.it summary .addr-i{font-family:var(--mono)}
+.it summary .d{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.it summary .conf{justify-self:end}
+.it .body{padding:4px 12px 12px;display:grid;gap:8px;font-size:13px}
+.it .body p{margin:0}
+.it .body .sug{color:var(--muted)}
+.it .acts{display:flex;flex-wrap:wrap;gap:6px}
+.it .acts .btn{padding:4px 10px;font-size:12px}
+@media (max-width:560px){.it summary{grid-template-columns:minmax(0,1fr) auto}.it summary .m,.it summary .g{display:none}}
+
+.stack{display:grid;gap:6px}
+.cat{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:4px;overflow:hidden}
+.cat > summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:10px;padding:8px 12px}
+.cat > summary::-webkit-details-marker{display:none}
+.cat > summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(-45deg);align-self:center;transition:transform .15s}
+.cat[open] > summary::before{transform:rotate(45deg)}
+.cat > summary:hover{background:var(--soft)}
+.cat .cl{font-weight:600;font-size:14px;white-space:nowrap}
+.cat .cs{font-size:12px;color:var(--muted);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat b{font-family:var(--mono);font-size:15px}
+.cat[data-empty] b{color:var(--muted)}
+.cat > .ilist{border:0;border-top:1px solid var(--line);border-radius:0}
+@media (max-width:480px){.cat .cs{display:none}.cat .cl{flex:1}}
+
+.it .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:16px;align-items:start}
+.it .split .l{display:grid;gap:8px;align-content:start}
+@media (max-width:720px){.it .split{grid-template-columns:minmax(0,1fr)}}
+
+.fun .fhead{display:flex;align-items:baseline;gap:8px;padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--line)}
+.fun .fhead b{font-family:var(--display);font-stretch:85%;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.fun .fhead span{font-size:13px;color:var(--muted)}
+.fun .track{display:flex;align-items:center;justify-content:flex-start;gap:8px;height:22px}
+.fun .track .bar{height:100%;min-width:0;padding:0;border-radius:3px;background:var(--c);background-image:none;flex:none;max-width:calc(100% - 84px)}
+.fun .track .val{font-family:var(--mono);font-size:13px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fun .track .val small{font-size:11px;color:var(--muted);margin-left:4px;font-weight:400}
+
+.tag.warm{color:var(--s-hv);border-color:currentColor}
+.tag.ok{color:var(--s-good);border-color:currentColor}
+.it summary .d.hot{color:var(--s-bad);font-weight:600}
+.tablewrap.flat{border:0;border-top:1px solid var(--line);border-radius:0}
+.chip b{font-family:var(--mono);font-weight:500;margin-left:2px}
+td .tag{margin:0 4px 0 0}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">2027 summer cycle · London &amp; Oslo</div>
+      <h1>Recruiting Pipeline</h1>
+    </div>
+    <div class="save" id="save"><b>●</b> Connecting…</div>
+  </header>
+
+  <nav class="top" role="tablist" aria-label="Sections">
+    <button class="ttab" role="tab" data-view="overview">Overview</button>
+    <button class="ttab" role="tab" data-view="linkedin">LinkedIn<span id="c-li"></span></button>
+    <button class="ttab" role="tab" data-view="email">Email<span id="c-em"></span></button>
+    <button class="ttab" role="tab" data-view="applications">Applications<span id="c-ap"></span></button>
+  </nav>
+
+  <!-- OVERVIEW -->
+  <section class="view" id="v-overview">
+    <div class="kpis">
+      <div class="kpi"><span class="n" id="k-out">0</span><span class="l">Total outreach</span></div>
+      <div class="kpi"><span class="n" id="k-reply">–</span><span class="l">Reply rate</span></div>
+      <div class="kpi"><span class="n" id="k-app">0</span><span class="l">Applications</span></div>
+      <div class="kpi"><span class="n" id="k-live">0</span><span class="l">Live (applied → interview)</span></div>
+      <div class="kpi"><span class="n" id="k-offer">0</span><span class="l">Offers</span></div>
+    </div>
+    <div class="sources" id="sources"></div>
+    <div>
+      <h2 class="sec">Today <span>Deadlines first, then replies, thank-yous, follow-ups and new people</span></h2>
+      <div class="stack" id="today"></div>
+    </div>
+    <div class="funnels">
+      <div><h2 class="sec">Applications funnel <span>Reached each stage or later</span></h2><div class="fun" id="fn-ov-app"></div></div>
+      <div><h2 class="sec">Outreach funnel <span>LinkedIn and email combined</span></h2><div class="fun" id="fn-ov-out"></div></div>
+    </div>
+
+  </section>
+
+  <!-- LINKEDIN -->
+  <section class="view" id="v-linkedin" hidden>
+    <div class="kpis k4">
+      <div class="kpi"><span class="n" id="li-n">0</span><span class="l">LinkedIn outreach</span></div>
+      <div class="kpi"><span class="n" id="li-r">–</span><span class="l">Reply rate</span></div>
+      <div class="kpi"><span class="n" id="li-c">0</span><span class="l">Calls booked or done</span></div>
+      <div class="kpi"><span class="n" id="li-f">0</span><span class="l">Need a follow-up</span></div>
+    </div>
+    <div><h2 class="sec">LinkedIn funnel</h2><div class="fun" id="fn-li"></div></div>
+    <div style="display:grid;gap:14px" data-tri="li"></div>
+    <div style="display:grid;gap:12px">
+      <h2 class="sec">People to reach out to <span>Found on LinkedIn, with a connection note ready</span></h2>
+      <div class="ilist" id="pros-li"></div>
+    </div>
+    <div style="display:grid;gap:12px" data-table="linkedin"></div>
+  </section>
+
+  <!-- EMAIL -->
+  <section class="view" id="v-email" hidden>
+    <div class="kpis k4">
+      <div class="kpi"><span class="n" id="em-n">0</span><span class="l">Emails sent</span></div>
+      <div class="kpi"><span class="n" id="em-r">–</span><span class="l">Reply rate</span></div>
+      <div class="kpi"><span class="n" id="em-c">0</span><span class="l">Calls booked or done</span></div>
+      <div class="kpi"><span class="n" id="em-f">0</span><span class="l">Need a follow-up</span></div>
+    </div>
+    <div><h2 class="sec">Email funnel</h2><div class="fun" id="fn-em"></div></div>
+    <div style="display:grid;gap:14px" data-tri="em"></div>
+    <div style="display:grid;gap:12px">
+      <h2 class="sec">Email finder <span>Likely work addresses from each firm's email format, with a cold email ready</span></h2>
+      <div class="ilist" id="pros-em"></div>
+    </div>
+    <div style="display:grid;gap:12px" data-table="email"></div>
+  </section>
+
+  <!-- APPLICATIONS -->
+  <section class="view" id="v-applications" hidden>
+    <div class="kpis k4">
+      <div class="kpi"><span class="n" id="ap-n">0</span><span class="l">Applications</span></div>
+      <div class="kpi"><span class="n" id="ap-l">0</span><span class="l">Live</span></div>
+      <div class="kpi"><span class="n" id="ap-p">0</span><span class="l">Preparing</span></div>
+      <div class="kpi"><span class="n" id="ap-o">0</span><span class="l">Offers</span></div>
+    </div>
+    <div><h2 class="sec">Funnel <span>Reached each stage or later</span></h2><div class="fun" id="fn-ap"></div></div>
+    <div style="display:grid;gap:12px" data-table="applications"></div>
+  </section>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <form class="panel" id="form">
+    <h3 id="f-title">Edit</h3>
+    <div class="grid2" id="fields"></div>
+    <div class="actions">
+      <div id="delwrap"></div>
+      <div><button type="button" class="btn" id="cancel">Cancel</button><button type="submit" class="btn primary">Save</button></div>
+    </div>
+  </form>
+</div>
+
+<script>
+const STAT = {
+  applications: [["Preparing","--s-prep"],["Applied","--s-sent"],["Online test","--s-test"],["HireVue","--s-hv"],["Interview","--s-int"],["Offer","--s-good"],["Rejected","--s-bad"],["Withdrawn","--s-cold"]],
+  outreach: [["Drafted","--s-prep"],["Sent","--s-sent"],["Replied","--s-test"],["Call booked","--s-int"],["Call done","--s-good"],["No reply","--s-cold"],["Declined","--s-bad"]]
+};
+const FIELDS = {
+  applications: [["company","Firm"],["role","Role"],["division","Division / desk"],["location","Location"],["status","Status","status"],["applied","Applied on","date"],["deadline","Deadline","date"],["source","Logged from","sel",["Manual","Gmail"]],["link","Posting link","url","full"],["notes","Notes","area","full"]],
+  linkedin: [["name","Name"],["firm","Firm"],["title","Title / desk"],["via","Referred by"],["status","Status","status"],["sent","Sent on","date"],["followUp","Follow up on","date"],["profile","Profile link","url"],["notes","Notes","area","full"]],
+  email: [["name","Name"],["firm","Firm"],["title","Title / desk"],["address","Email address"],["status","Status","status"],["sent","Sent on","date"],["followUp","Follow up on","date"],["via","Referred by"],["notes","Notes","area","full"]]
+};
+const CH = {linkedin:"LinkedIn", email:"Email"};
+const live = new Set(["Applied","Online test","HireVue","Interview"]);
+const replied = new Set(["Replied","Call booked","Call done","Declined"]);
+const contacted = new Set(["Sent","Replied","Call booked","Call done","No reply","Declined"]);
+const met = new Set(["Call booked","Call done"]);
+const VIEWS = ["overview","linkedin","email","applications"];
+
+let state = {applications:[], outreach:[]};
+let view = "overview", db = null, mcp = null, editing = null;
+const ui = {linkedin:{filter:null,q:""}, email:{filter:null,q:""}, applications:{filter:null,q:"",type:null}};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+const days = iso => iso ? Math.round((today() - new Date(iso + "T00:00:00")) / 864e5) : null;
+const fmt = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"}) : "";
+const kindOf = v => v === "applications" ? "applications" : "outreach";
+const color = (kind, s) => (STAT[kind].find(x => x[0] === s) || [0,"--s-prep"])[1];
+const rate = rows => { const s = rows.filter(r => contacted.has(r.status)).length; return s ? Math.round(rows.filter(r => replied.has(r.status)).length / s * 100) + "%" : "–"; };
+const lastTouch = r => [r.sent, r.followedUp].filter(Boolean).sort().pop();
+const overdue = r => r.status === "Sent" && ((days(lastTouch(r)) ?? 0) >= 7 || (r.followUp && days(r.followUp) >= 0));
+const TYPES = ["Summer","Off-cycle","Graduate","Part-time","Event","Other"];
+function typeOf(r){
+  if (r.type) return r.type;
+  const t = ((r.role || "") + " " + (r.division || "")).toLowerCase();
+  if (/insight|event|discover|spring week|open day/.test(t)) return "Event";
+  if (/off-cycle|off cycle|placement|6m /.test(t)) return "Off-cycle";
+  if (/student|part-time|studentmedarbeider|deltid/.test(t)) return "Part-time";
+  if (/summer|intern|sommer/.test(t)) return "Summer";
+  if (/graduate|grad|trainee|nyutdannet|analyst|associate|junior|program/.test(t)) return "Graduate";
+  return "Other";
+}
+const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\(.*?\)/g, "")
+  .replace(/\b(oslo|london|stockholm|plc|group|asa|as|ltd|bank|securities|capital markets)\b/g, "").replace(/[^a-z]/g, "");
+const firmMatch = (a, b) => { a = norm(a); b = norm(b); return a.length >= 2 && b.length >= 2 && (a.startsWith(b) || b.startsWith(a)); };
+const contactsFor = app => state.outreach.filter(o => firmMatch(o.firm, app.company));
+const appsFor = o => state.applications.filter(a => firmMatch(o.firm, a.company));
+const nameKey = n => norm(n);
+const today0 = () => new Date().toISOString().slice(0,10);
+let doneMap = {};
+const ofCh = ch => state.outreach.filter(r => (r.channel || "LinkedIn") === ch);
+function setSave(ok, text){ const el = $("save"); el.className = "save" + (ok ? "" : " off"); el.innerHTML = "<b>●</b> " + esc(text); }
+
+
+/* ---------- funnels ---------- */
+const AP_RANK = {"Applied":1,"Online test":2,"HireVue":3,"Interview":4,"Offer":5};
+const apRank = r => r.status === "Rejected" || r.status === "Withdrawn" ? (AP_RANK[r.rejectedAt] || 1) : (AP_RANK[r.status] || 0);
+const OUT_RANK = {"Sent":1,"No reply":1,"Replied":2,"Declined":2,"Call booked":3,"Call done":4};
+const pc = (a,b) => b ? Math.round(a / b * 100) + "%" : "–";
+function drawFunnel(id, stages, foot){
+  const el = $(id); if (!el) return;
+  const [head, ...rest] = stages, top = head.n;
+  const max = Math.max(1, ...rest.map(st => st.n));
+  el.innerHTML = `<div class="fhead"><b>${top}</b><span>${head.label.toLowerCase()}</span></div>` +
+    rest.map((st,i) => `<div class="row"><span class="lab">${st.label}</span>
+      <span class="track"><span class="bar" style="width:${st.n / max * 100}%;--c:var(${st.c})"></span><span class="val">${st.n}<small>(${pc(st.n, top)})</small></span></span>
+      <span class="cv"><b>${pc(st.n, (i ? rest[i-1] : head).n)}</b> step</span></div>`).join("") +
+    (foot ? `<div class="foot">${foot}</div>` : "");
+}
+function appFunnel(id){
+  const real = state.applications.filter(r => typeOf(r) !== "Event");
+  const A = real.filter(r => apRank(r) >= 1);
+  const at = k => A.filter(r => apRank(r) >= k).length;
+  const rej = real.filter(r => r.status === "Rejected").length;
+  const ev = state.applications.length - real.length;
+  drawFunnel(id, [
+    {label:"Applied", n:A.length, c:"--s-sent"}, {label:"Online test", n:at(2), c:"--s-test"},
+    {label:"HireVue", n:at(3), c:"--s-hv"}, {label:"Interview", n:at(4), c:"--s-int"}, {label:"Offer", n:at(5), c:"--s-good"}],
+    `<span>Rejected <b>${rej}</b> (${pc(rej, A.length)})</span><span>Still live <b>${state.applications.filter(r => live.has(r.status)).length}</b></span><span>Preparing <b>${state.applications.filter(r => r.status === "Preparing").length}</b></span>${ev ? `<span>Events excluded <b>${ev}</b></span>` : ""}`);
+}
+function outFunnel(id, rows){
+  const R = rows.filter(r => (OUT_RANK[r.status] || 0) >= 1);
+  const at = k => R.filter(r => OUT_RANK[r.status] >= k).length;
+  drawFunnel(id, [
+    {label:"Sent", n:R.length, c:"--s-sent"}, {label:"Replied", n:at(2), c:"--s-test"},
+    {label:"Call booked", n:at(3), c:"--s-int"}, {label:"Call done", n:at(4), c:"--s-good"}],
+    `<span>Waiting on reply <b>${rows.filter(r => r.status === "Sent").length}</b></span><span>Follow-up due <b>${rows.filter(overdue).length}</b></span><span>Declined <b>${rows.filter(r => r.status === "Declined").length}</b></span>`);
+}
+/* ---------- views ---------- */
+function show(v){
+  view = VIEWS.includes(v) ? v : "overview";
+  document.querySelectorAll(".ttab").forEach(b => b.setAttribute("aria-selected", b.dataset.view === view));
+  VIEWS.forEach(x => $("v-" + x).hidden = x !== view);
+  try { history.replaceState(null, "", "#" + view); } catch(e){}
+  render();
+}
+
+function renderFunnel(kind, barId, legId, nId){
+  const rows = state[kind], total = rows.length;
+  $(nId).textContent = total + " total";
+  $(barId).innerHTML = total ? STAT[kind].map(([s,c]) => { const n = rows.filter(r => r.status === s).length; return n ? `<i title="${s}: ${n}" style="width:${n/total*100}%;background:var(${c})"></i>` : ""; }).join("") : "";
+  $(legId).innerHTML = STAT[kind].map(([s,c]) => `<span><i class="dot" style="background:var(${c})"></i>${s} <b>${rows.filter(r => r.status === s).length}</b></span>`).join("");
+}
+
+function renderOverview(){
+  const O = state.outreach, A = state.applications, LI = ofCh("LinkedIn"), EM = ofCh("Email");
+  const triItems = [...(tri.li.data?.items || []).map(i => ({...i, ch:"LinkedIn"})), ...(tri.em.data?.items || []).map(i => ({...i, ch:"Email"}))];
+  $("k-out").textContent = O.length; $("k-reply").textContent = rate(O);
+  $("k-app").textContent = A.length; $("k-live").textContent = A.filter(r => live.has(r.status)).length; $("k-offer").textContent = A.filter(r => r.status === "Offer").length;
+  const owe = triItems.filter(i => i.ch === "LinkedIn" && (i.bucket === "reply" || i.bucket === "thank")).length;
+  $("sources").innerHTML = `
+    <button class="src" data-go="linkedin"><div class="h"><strong>LinkedIn</strong><span>Open →</span></div>
+      <div class="big">${LI.length}<small>people messaged</small></div>
+      <dl><dt>Reply rate</dt><dd>${rate(LI)}</dd><dt>Calls booked or done</dt><dd>${LI.filter(r => met.has(r.status)).length}</dd>
+      <dt>Replies / thanks owed</dt><dd class="${owe ? "warn" : ""}">${triage ? owe : "–"}</dd><dt>Need a follow-up</dt><dd class="${LI.filter(overdue).length ? "warn" : ""}">${LI.filter(overdue).length}</dd></dl></button>
+    <button class="src" data-go="email"><div class="h"><strong>Email</strong><span>Open →</span></div>
+      <div class="big">${EM.length}<small>emails sent</small></div>
+      <dl><dt>Reply rate</dt><dd>${rate(EM)}</dd><dt>Calls booked or done</dt><dd>${EM.filter(r => met.has(r.status)).length}</dd>
+      <dt>Need a follow-up</dt><dd class="${EM.filter(overdue).length ? "warn" : ""}">${EM.filter(overdue).length}</dd></dl></button>
+    <button class="src" data-go="applications"><div class="h"><strong>Applications</strong><span>Open →</span></div>
+      <div class="big">${A.length}<small>tracked</small></div>
+      <dl><dt>Live</dt><dd>${A.filter(r => live.has(r.status)).length}</dd><dt>Preparing</dt><dd>${A.filter(r => r.status === "Preparing").length}</dd>
+      <dt>Offers</dt><dd>${A.filter(r => r.status === "Offer").length}</dd><dt>Rejected</dt><dd>${A.filter(r => r.status === "Rejected").length}</dd></dl></button>`;
+  appFunnel("fn-ov-app"); outFunnel("fn-ov-out", state.outreach);
+  renderToday(triItems);
+}
+
+function triKey(i){ return i.ch + ":" + i.bucket + ":" + nameKey(i.name); }
+function doneTag(key){ return doneMap[key] ? `<span class="tag ok">Sent ${fmt(doneMap[key])}</span>` : ""; }
+const triMap = new Map();
+function triBody(i){
+  const key = triKey(i); triMap.set(key, i);
+  const acts = i.draft && !doneMap[key] ? `<div class="acts"><button class="btn primary" data-msent="${esc(key)}">Mark sent</button></div>` : doneTag(key);
+  return split(`<p class="gist">${esc(i.gist)}</p>${i.suggestion ? `<p class="sug">${esc(i.suggestion)}</p>` : ""}${acts}`, draftBox("Draft", i.draft, i.subject));
+}
+function renderToday(triItems){
+  const open = triItems.filter(i => !doneMap[triKey(i)]);
+  const testsLive = state.applications.filter(r => (r.status === "Online test" || r.status === "HireVue") && !/completed/i.test(r.notes || ""));
+  const dl = testsLive.map(r => {
+    const d = r.deadline ? -days(r.deadline) : null, passed = /deadline passed/i.test(r.notes || "") || (d != null && d < 0);
+    return {r, d, passed, label: passed ? "Deadline passed" : d != null ? (d === 0 ? "Due today" : "Due in " + d + "d") : "Check portal"};
+  }).sort((a,b) => (b.passed - a.passed) || ((a.d ?? 999) - (b.d ?? 999)));
+  const fuNames = new Set(open.filter(i => i.bucket === "followup").map(i => nameKey(i.name)));
+  const fuRows = state.outreach.filter(overdue).filter(r => !fuNames.has(nameKey(r.name)));
+  const warm = state.applications.filter(a => ["Applied","Online test","HireVue","Interview"].includes(a.status))
+    .map(a => ({a, c: contactsFor(a).filter(o => ["Replied","Call booked","Call done"].includes(o.status))})).filter(x => x.c.length);
+  const newP = prospects.filter(p => (p.status || "New") === "New").slice(0, 3);
+  const triRow = i => item("t:" + triKey(i), `<strong>${esc(i.name)}<span class="tag">${esc(i.ch)}</span></strong><span class="m">${esc(i.firm || "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${fmt(i.lastDate)}</span>`, triBody(i));
+  const groups = [
+    ["dl","Deadlines","Tests and HireVues not yet completed","--s-bad", dl.map(x => item("dl:" + x.r.id,
+      `<strong>${esc(x.r.company)}</strong><span class="m">${esc(x.r.status)}</span><span class="g">${esc(x.r.role || "")}</span><span class="d ${x.passed || (x.d != null && x.d <= 3) ? "hot" : ""}">${x.label}</span>`,
+      `<p class="gist">${esc(x.r.notes || "No notes.")}</p><p class="sug">${x.r.deadline ? "Deadline " + fmt(x.r.deadline) + ". " : "No deadline in the emails. Check the portal. "}When done, add "Completed" to the notes or move the status.</p>`))],
+    ["reply","Needs your reply","They asked something or proposed a next step","--s-int", open.filter(i => i.bucket === "reply").map(triRow)],
+    ["thank","Send a thank-you","They helped or you met","--s-good", open.filter(i => i.bucket === "thank").map(triRow)],
+    ["followup","Follow up","7+ days without an answer","--s-sent", [...open.filter(i => i.bucket === "followup").map(triRow), ...fuRows.map(r => item("fu:" + r.id,
+      `<strong>${esc(r.name)}<span class="tag">${esc(r.channel || "LinkedIn")}</span></strong><span class="m">${esc(r.firm || "")}</span><span class="g">No draft yet. Run a check to get one.</span><span class="d">${days(lastTouch(r))}d</span>`,
+      `<p class="gist">${esc(r.notes || "")}</p><div class="acts"><button class="btn" data-fudone="${r.id}">Mark followed up</button></div>`))]],
+    ["warm","Warm leads","Live applications where you know someone","--s-hv", warm.map(x => item("w:" + x.a.id,
+      `<strong>${esc(x.a.company)}</strong><span class="m">${esc(x.a.status)}</span><span class="g">${esc(x.c.map(o => o.name).join(", "))}</span>`,
+      `<p class="gist">${esc(x.a.role || "")}</p><p class="sug">Let ${esc(x.c[0].name)} know where you are in the process. A short update keeps you top of mind when the desk discusses candidates.</p>`))],
+    ["new","New people","Found on LinkedIn, note ready","--s-prep", newP.map(p => item("np:" + p.id,
+      `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g">${esc(p.why || "")}</span>`,
+      split(`<p class="gist">${esc(p.why || "")}</p><div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button></div>`, draftBox("Connection note", p.liDraft))))]
+  ];
+  if (!todayInit && groups.some(g => g[4].length)){ todayInit = true; groups.forEach(g => { if (g[4].length && ["dl","reply","thank"].includes(g[0])) openKeys.add("today:" + g[0]); }); }
+  $("today").innerHTML = groups.map(([k,label,sub,c,rows]) => `<details class="cat" data-key="today:${k}" style="--c:var(${c})"${openKeys.has("today:" + k) ? " open" : ""}${rows.length ? "" : " data-empty"}>
+    <summary><span class="cl">${label}</span><span class="cs">${sub}</span><b>${rows.length}</b></summary>
+    <div class="ilist">${rows.length ? rows.join("") : '<p class="empty-note">Nothing here.</p>'}</div></details>`).join("");
+}
+let todayInit = false;
+
+async function markSent(key){
+  const i = triMap.get(key); if (!i) return;
+  const d = today0();
+  doneMap = {...doneMap, [key]: d}; render();
+  if (db) db.doc("triage/done").set({items: doneMap}).catch(() => setSave(false, "Not saved, try again"));
+  const o = state.outreach.find(r => nameKey(r.name) === nameKey(i.name));
+  if (o){
+    const up = {lastContact: d};
+    if (i.bucket === "followup") up.followedUp = d;
+    if (i.bucket === "reply" && o.status === "Sent") up.status = "Replied";
+    if (i.bucket === "thank" && (o.status === "Replied" || o.status === "Call booked")) up.status = "Call done";
+    write("outreach", o.id, up);
+  }
+}
+
+function renderStats(){
+  const LI = ofCh("LinkedIn"), EM = ofCh("Email"), A = state.applications;
+  $("c-li").textContent = LI.length; $("c-em").textContent = EM.length; $("c-ap").textContent = A.length;
+  $("li-n").textContent = LI.length; $("li-r").textContent = rate(LI); $("li-c").textContent = LI.filter(r => met.has(r.status)).length; $("li-f").textContent = LI.filter(overdue).length;
+  $("em-n").textContent = EM.length; $("em-r").textContent = rate(EM); $("em-c").textContent = EM.filter(r => met.has(r.status)).length; $("em-f").textContent = EM.filter(overdue).length;
+  $("ap-n").textContent = A.length; $("ap-l").textContent = A.filter(r => live.has(r.status)).length; $("ap-p").textContent = A.filter(r => r.status === "Preparing").length; $("ap-o").textContent = A.filter(r => r.status === "Offer").length;
+}
+
+function tableShell(v){
+  if (v === "applications") return `<div class="toolbar"><div class="l" data-chips="applications"></div><div class="r"><input type="search" id="q-applications" placeholder="Search" aria-label="Search" data-q="applications"><button class="btn primary" data-add="applications">Add application</button></div></div>
+    <div class="stack" id="apps-groups"></div>`;
+  const label = v === "applications" ? "Add application" : v === "email" ? "Add email outreach" : "Add LinkedIn outreach";
+  return `<div class="toolbar"><div class="l" data-chips="${v}"></div><div class="r"><input type="search" id="q-${v}" placeholder="Search" aria-label="Search" data-q="${v}"><button class="btn primary" data-add="${v}">${label}</button></div></div>
+    <div class="tablewrap"><table><thead data-head="${v}"></thead><tbody data-body="${v}"></tbody></table></div>`;
+}
+document.querySelectorAll("[data-table]").forEach(el => el.innerHTML = tableShell(el.dataset.table));
+
+function renderApps(){
+  const u = ui.applications, all = state.applications, q = u.q.toLowerCase();
+  const counts = Object.fromEntries(TYPES.map(t => [t, all.filter(r => typeOf(r) === t).length]));
+  document.querySelector('[data-chips="applications"]').innerHTML = `<button class="chip" data-atype="" aria-pressed="${!u.type}">All <b>${all.length}</b></button>` +
+    TYPES.filter(t => counts[t]).map(t => `<button class="chip" data-atype="${t}" aria-pressed="${u.type === t}">${t} <b>${counts[t]}</b></button>`).join("");
+  const rows = all.filter(r => (!u.type || typeOf(r) === u.type) && (!q || Object.values(r).join(" ").toLowerCase().includes(q)))
+    .sort((a,b) => String(b.applied || "").localeCompare(String(a.applied || "")));
+  const pill = r => `<span class="pill" style="--c:var(${color("applications", r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="applications">${STAT.applications.map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
+  const dash = '<span class="blank">–</span>';
+  const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><strong>${esc(r.company)}</strong><small>${esc(r.role || "")}</small></td>
+    <td><span class="tag">${typeOf(r)}</span>${c.length ? `<span class="tag warm" title="${esc(c.map(o => o.name + " (" + o.status + ")").join(", "))}">${c.length} contact${c.length > 1 ? "s" : ""}</span>` : ""}</td>
+    <td>${esc(r.location || "")}</td><td>${pill(r)}</td><td class="num">${fmt(r.applied) || dash}</td>
+    <td class="num ${r.deadline && -days(r.deadline) <= 3 && -days(r.deadline) >= 0 ? "overdue" : ""}">${fmt(r.deadline) || dash}</td>
+    <td class="notes" title="${esc(r.notes)}">${esc(r.notes)}</td><td><button class="rowbtn" data-edit="${r.id}" data-v="applications">Edit</button></td></tr>`; };
+  const G = [["live","Live","Tests, HireVues, interviews, offers",["Online test","HireVue","Interview","Offer"],"--s-hv"],["applied","Applied","Waiting to hear back",["Applied"],"--s-sent"],
+    ["prep","Preparing","Not submitted yet",["Preparing"],"--s-prep"],["closed","Closed","Rejected or withdrawn",["Rejected","Withdrawn"],"--s-bad"]];
+  if (!appsInit && all.length){ appsInit = true; ["live","applied","prep"].forEach(k => openKeys.add("apps:" + k)); }
+  $("apps-groups").innerHTML = G.map(([k,label,sub,st,c]) => { const list = rows.filter(r => st.includes(r.status));
+    return `<details class="cat" data-key="apps:${k}" style="--c:var(${c})"${openKeys.has("apps:" + k) ? " open" : ""}${list.length ? "" : " data-empty"}>
+      <summary><span class="cl">${label}</span><span class="cs">${sub}</span><b>${list.length}</b></summary>
+      ${list.length ? `<div class="tablewrap flat"><table><thead><tr><th>Firm / role</th><th>Type</th><th>Location</th><th>Status</th><th>Applied</th><th>Deadline</th><th>Notes</th><th></th></tr></thead><tbody>${list.map(tr).join("")}</tbody></table></div>` : '<p class="empty-note" style="padding:10px 12px">Nothing here.</p>'}</details>`; }).join("");
+}
+let appsInit = false;
+function renderTable(v){
+  if (v === "applications") return renderApps();
+  const kind = kindOf(v), u = ui[v];
+  document.querySelector(`[data-chips="${v}"]`).innerHTML = `<button class="chip" data-v="${v}" data-f="" aria-pressed="${!u.filter}">All</button>` +
+    STAT[kind].map(([s,c]) => `<button class="chip" data-v="${v}" data-f="${s}" aria-pressed="${u.filter === s}"><i class="dot" style="background:var(${c})"></i>${s}</button>`).join("");
+  const base = kind === "applications" ? state.applications : ofCh(CH[v]);
+  const q = u.q.toLowerCase();
+  const rows = base.filter(r => (!u.filter || r.status === u.filter) && (!q || Object.values(r).join(" ").toLowerCase().includes(q)))
+    .sort((a,b) => String(b.applied || b.sent || "").localeCompare(String(a.applied || a.sent || "")));
+  const head = document.querySelector(`[data-head="${v}"]`), body = document.querySelector(`[data-body="${v}"]`);
+  const pill = r => `<span class="pill" style="--c:var(${color(kind, r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="${kind}">${STAT[kind].map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
+  const edit = r => `<button class="rowbtn" data-edit="${r.id}" data-v="${v}">Edit</button>`;
+  const dash = '<span class="blank">–</span>';
+  const empty = `<tr class="emptyrow"><td colspan="7">${base.length ? "No rows match this filter." : v === "applications" ? "No applications yet. Add one, or let Claude log them from Gmail." : v === "email" ? "No email outreach yet. Add the first person you email." : "No LinkedIn outreach yet. Press Check LinkedIn to pull it in."}</td></tr>`;
+  if (kind === "applications"){
+    head.innerHTML = "<tr><th>Firm / role</th><th>Location</th><th>Status</th><th>Applied</th><th>Deadline</th><th>Notes</th><th></th></tr>";
+    body.innerHTML = rows.length ? rows.map(r => `<tr><td class="who"><strong>${esc(r.company)}</strong><small>${esc([r.role,r.division].filter(Boolean).join(" · "))}</small></td>
+      <td>${esc(r.location)}</td><td>${pill(r)}</td><td class="num">${fmt(r.applied) || dash}</td>
+      <td class="num ${r.deadline && days(r.deadline) > -7 && days(r.deadline) <= 0 ? "overdue" : ""}">${fmt(r.deadline) || dash}</td>
+      <td class="notes" title="${esc(r.notes)}">${esc(r.notes)}</td><td>${edit(r)}</td></tr>`).join("") : empty;
+  } else {
+    head.innerHTML = `<tr><th>Person</th><th>${v === "email" ? "Address" : "Referred by"}</th><th>Status</th><th>Sent</th><th>Waiting</th><th>Notes</th><th></th></tr>`;
+    body.innerHTML = rows.length ? rows.map(r => { const d = r.status === "Sent" ? days(r.sent) : null; return `<tr>
+      <td class="who"><strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))}</small>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
+      <td>${v === "email" ? (r.address ? `<span style="font-family:var(--mono);font-size:12px">${esc(r.address)}</span>` : dash) : (r.via ? esc(r.via) : dash)}</td>
+      <td>${pill(r)}</td><td class="num">${fmt(r.sent) || dash}</td>
+      <td class="num ${d >= 7 ? "overdue" : ""}">${d != null ? d + "d" : dash}</td>
+      <td class="notes" title="${esc(r.notes)}">${esc(r.notes)}</td><td>${edit(r)}</td></tr>`; }).join("") : empty;
+  }
+}
+
+function render(){
+  drafts.clear();
+  renderStats();
+  if (view === "overview") renderOverview();
+  else renderTable(view);
+  if (view === "applications") appFunnel("fn-ap");
+  if (view === "linkedin") outFunnel("fn-li", ofCh("LinkedIn"));
+  if (view === "email") outFunnel("fn-em", ofCh("Email"));
+  if (view === "linkedin"){ renderTriage("li"); renderProspects(); }
+  if (view === "email"){ renderTriage("em"); renderProspects(); }
+}
+
+/* ---------- writes ---------- */
+async function write(kind, id, data, mode){
+  const row = state[kind].find(r => r.id === id);
+  if (mode === "delete") state[kind] = state[kind].filter(r => r.id !== id);
+  else if (row) Object.assign(row, data); else state[kind].push({id, ...data});
+  render();
+  if (!db) return;
+  try {
+    const ref = db.collection(kind).doc(id);
+    if (mode === "delete") await ref.delete();
+    else { const clean = {...state[kind].find(r => r.id === id)}; delete clean.id; clean.updated = new Date().toISOString(); await ref.set(clean); }
+  } catch(e){ setSave(false, e.code === "invalid_argument" ? "Read-only for you" : "Not saved, try again"); }
+}
+
+function openForm(v, id){
+  const kind = kindOf(v), row = id ? state[kind].find(r => r.id === id) : null;
+  editing = {kind, v, id: id || ("r" + Date.now().toString(36))};
+  $("f-title").textContent = (row ? "Edit " : "New ") + (v === "applications" ? "application" : CH[v] + " outreach");
+  $("fields").innerHTML = FIELDS[v].map(([k,l,t,x]) => {
+    const v0 = esc(row?.[k] ?? "");
+    const cls = x === "full" ? ' class="full"' : "";
+    let input;
+    if (t === "status") input = `<select id="fld-${k}" name="${k}">${STAT[kind].map(([s]) => `<option${s === (row?.status ?? STAT[kind][1][0]) ? " selected" : ""}>${s}</option>`).join("")}</select>`;
+    else if (t === "sel") input = `<select id="fld-${k}" name="${k}">${x.map(o => `<option${o === (row?.[k] ?? x[0]) ? " selected" : ""}>${o}</option>`).join("")}</select>`;
+    else if (t === "area") input = `<textarea id="fld-${k}" name="${k}" rows="3">${v0}</textarea>`;
+    else input = `<input id="fld-${k}" name="${k}" type="${t === "date" ? "date" : t === "url" ? "url" : "text"}" value="${v0}"${k === "company" || k === "name" ? " required" : ""}>`;
+    return `<label${cls}>${l}${input}</label>`;
+  }).join("");
+  $("delwrap").innerHTML = row ? `<button type="button" class="btn danger" id="del">Delete</button>` : "";
+  $("sheet").hidden = false;
+  $("fields").querySelector("input,select")?.focus();
+}
+function closeForm(){ $("sheet").hidden = true; editing = null; }
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.view) show(t.dataset.view);
+  else if (t.dataset.go) show(t.dataset.go);
+  else if (t.dataset.f !== undefined && t.dataset.v){ ui[t.dataset.v].filter = t.dataset.f || null; render(); }
+  else if (t.dataset.edit) openForm(t.dataset.v, t.dataset.edit);
+  else if (t.dataset.add) openForm(t.dataset.add, null);
+  else if (t.id === "cancel") closeForm();
+  else if (t.id === "del") $("delwrap").innerHTML = `<span class="confirm">Delete for good?<button type="button" class="btn danger" id="del-yes">Delete</button><button type="button" class="btn" id="del-no">Keep</button></span>`;
+  else if (t.id === "del-no") $("delwrap").innerHTML = `<button type="button" class="btn danger" id="del">Delete</button>`;
+  else if (t.id === "del-yes"){ const {kind,id} = editing; closeForm(); write(kind, id, null, "delete"); }
+});
+document.addEventListener("change", e => { const s = e.target.dataset?.status; if (s) write(e.target.dataset.kind, s, {status: e.target.value}); });
+document.addEventListener("input", e => { const v = e.target.dataset?.q; if (v){ ui[v].q = e.target.value; render(); } });
+$("sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeForm(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("sheet").hidden) closeForm(); });
+$("form").addEventListener("submit", e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const {kind, v, id} = editing;
+  if (kind === "outreach" && !state.outreach.find(r => r.id === id)) data.channel = CH[v];
+  closeForm(); write(kind, id, data);
+});
+
+/* ---------- triage (LinkedIn + Email) ---------- */
+const SRC = {
+  li: {title:"LinkedIn inbox", btn:"Check LinkedIn", trigger:"trig_01BtQ8mfSsPCQ78Z44AumcGm", doc:"triage/latest", run:"triage/run",
+       running:"Reading your LinkedIn inbox through Chrome and looking for new people. Results land here in a few minutes; keep Chrome open.",
+       err:"The last check could not read LinkedIn. Open Chrome, make sure you're signed in, and try again.",
+       empty:"Press Check LinkedIn and your conversations show up here, sorted by what you need to do, with a draft for each."},
+  em: {title:"Email inbox", btn:"Check email", trigger:"trig_01DbAW5zikY9RUvv4a1NcSu1", doc:"emailtriage/latest", run:"emailtriage/run",
+       running:"Reading Gmail, logging applications and looking up email addresses. Results land here in a few minutes.",
+       err:"The last check could not read Gmail. Check the Gmail connector in claude.ai settings and try again.",
+       empty:"Press Check email to sort your recruiting emails, log new applications from Gmail and find addresses for your prospects."}
+};
+const BUCKETS = [
+  ["reply","Needs your reply","They asked something or proposed a next step","--s-int"],
+  ["thank","Send a thank-you","They helped or you met. Close the loop","--s-good"],
+  ["followup","Follow up","You messaged 7+ days ago, no answer","--s-sent"],
+  ["waiting","Waiting","Sent recently, give it time","--s-prep"]
+];
+const tri = {li:{data:null, req:null}, em:{data:null, req:null}};
+let triage = null; /* LinkedIn triage, used by Overview */
+let prospects = [];
+const drafts = new Map(); let draftSeq = 0;
+function fmtDraft(t){
+  if (!t) return t;
+  let s = String(t).replace(/\r/g, "").trim();
+  if (s.includes("\n")) return s;
+  let greet = "", sign = "", m;
+  if ((m = s.match(/^((?:Hei|Hi|Hello|Dear|Hey|Kjære)\s[^!,.\n]{1,40}[!,])\s*/))) { greet = m[1]; s = s.slice(m[0].length); }
+  if ((m = s.match(/\s*((?:Med vennlig hilsen|Vennlig hilsen|Mvh|Hilsen|Best regards|Kind regards|Many thanks|Thanks|Regards|Best),?)\s+(Subhan.*)$/))) {
+    sign = m[1] + "\n" + m[2].replace(/,\s*/, "\n"); s = s.slice(0, m.index);
+  } else if ((m = s.match(/\s+(Subhan(?: Butt)?(?:,.*)?)$/))) { sign = m[1].replace(/,\s*/, "\n"); s = s.slice(0, m.index); }
+  const sent = s.split(/(?<=[.!?])\s+(?=[A-ZÆØÅ"“])/).filter(Boolean);
+  const paras = []; for (let i = 0; i < sent.length; i += 2) paras.push(sent.slice(i, i + 2).join(" "));
+  return [greet, paras.join("\n\n"), sign].filter(Boolean).join("\n\n");
+}
+function draftBox(label, text, subject){
+  if (!text) return "";
+  text = fmtDraft(text);
+  const id = "d" + (++draftSeq); drafts.set(id, (subject ? "Subject: " + subject + "\n\n" : "") + text);
+  return `<div class="draft"><div class="dh"><b>${esc(label)}</b><button class="copy" data-copy="${id}">Copy</button></div>${subject ? `<div class="subj">${esc(subject)}</div>` : ""}<pre>${esc(text)}</pre></div>`;
+}
+document.querySelectorAll("[data-tri]").forEach(el => { const k = el.dataset.tri, s = SRC[k];
+  el.innerHTML = `<div class="tri-head"><div><h2>${s.title}</h2><p class="tri-meta" id="tri-meta-${k}">Not checked yet.</p></div><button class="btn primary" data-run="${k}" id="tri-run-${k}">${s.btn}</button></div>
+    <p class="tri-note" id="tri-note-${k}" hidden></p><div class="tri-groups" id="tri-groups-${k}"></div>`; });
+
+function renderTriage(k){
+  const s = SRC[k], t = tri[k], btn = $("tri-run-" + k), note = $("tri-note-" + k);
+  const doneAt = t.data?.runAt ? new Date(t.data.runAt) : null;
+  const running = t.req && (!doneAt || new Date(t.req) > doneAt) && (Date.now() - new Date(t.req)) < 20*60e3;
+  btn.disabled = !!running; btn.textContent = running ? "Checking…" : s.btn;
+  $("tri-meta-" + k).textContent = doneAt ? "Last checked " + doneAt.toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "Not checked yet.";
+  if (running){ note.hidden = false; note.className = "tri-note"; note.textContent = s.running; }
+  else if (t.data?.status === "error"){ note.hidden = false; note.className = "tri-note err"; note.textContent = t.data.message || s.err; }
+  else if (!note.dataset.sticky) note.hidden = true;
+  const items = t.data?.items || [];
+  if (!items.length){ $("tri-groups-" + k).innerHTML = `<p class="empty-note">${s.empty}</p>`; return; }
+  const cats = [...BUCKETS, ["none","No action","Friends, ads, closed","--s-cold"]];
+  if (!triInit[k]){ triInit[k] = true; const first = cats.find(([b]) => b !== "none" && items.some(i => i.bucket === b)); if (first) openKeys.add("cat:" + k + ":" + first[0]); }
+  $("tri-groups-" + k).innerHTML = `<div class="stack">${cats.map(([b,label,sub,c]) => {
+    const list = items.filter(i => i.bucket === b), key = "cat:" + k + ":" + b;
+    return `<details class="cat" data-key="${key}" style="--c:var(${c})"${openKeys.has(key) ? " open" : ""}${list.length ? "" : " data-empty"}>
+      <summary><span class="cl">${label}</span><span class="cs">${sub}</span><b>${list.length}</b></summary>
+      <div class="ilist">${list.length ? list.map(i => { const ii = {...i, ch: k === "li" ? "LinkedIn" : "Email"}; return item(k + ":" + i.name, `<strong>${esc(i.name)}</strong><span class="m">${esc(i.firm || "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${doneMap[triKey(ii)] ? "Sent ✓" : fmt(i.lastDate)}</span>`,
+        triBody(ii)); }).join("") : '<p class="empty-note">Nothing here.</p>'}</div></details>`;
+  }).join("")}</div>`;
+}
+const triInit = {li:false, em:false};
+const split = (left, right) => right ? `<div class="split"><div class="l">${left}</div><div class="r">${right}</div></div>` : left;
+const triSel = {li:null, em:null};
+const openKeys = new Set();
+function item(key, head, body){
+  const k = esc(key);
+  return `<details class="it" data-key="${k}"${openKeys.has(key) ? " open" : ""}><summary>${head}</summary><div class="body">${body}</div></details>`;
+}
+document.addEventListener("toggle", e => { const d = e.target; if (d.matches?.("details.it, details.cat")) { d.open ? openKeys.add(d.dataset.key) : openKeys.delete(d.dataset.key); } }, true);
+
+function emailLine(p){
+  if (!p.emailGuess) return `<div class="src-l">No address yet. Press Check email on the Email tab to look it up.</div>`;
+  return `<div class="addr"><span>${esc(p.emailGuess)}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc(p.emailConfidence || "low")}</span><button class="copy" data-copytext="${esc(p.emailGuess)}">Copy</button></div>
+    <div class="src-l">${p.emailPattern ? "Format " + esc(p.emailPattern) : ""}${p.emailAlt ? " · alt " + esc(p.emailAlt) : ""}${p.emailSource ? ` · <a href="${esc(p.emailSource)}" target="_blank" rel="noopener">source</a>` : ""}</div>`;
+}
+function renderProspects(){
+  const open = prospects.filter(p => (p.status || "New") === "New").sort((a,b) => String(b.foundAt||"").localeCompare(String(a.foundAt||"")));
+  $("pros-li").innerHTML = open.length ? open.map(p => item("p:" + p.id,
+      `<strong>${esc(p.name)}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
+      split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${emailLine(p)}
+       <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, draftBox("Connection note", p.liDraft)))).join("")
+    : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
+  const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address).map(r => ({...r, kind:"o"}))];
+  $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
+      `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
+      split(`${emailLine(p)}
+       <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject)))).join("")
+    : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and rates each guess high, medium or low.</p>`;
+}
+async function prospectAction(act, id){
+  const p = prospects.find(x => x.id === id); if (!p) return;
+  const now = new Date().toISOString().slice(0,10);
+  if (act === "li" || act === "em"){
+    write("outreach", id, {name:p.name, firm:p.firm || "", title:p.title || "", channel: act === "li" ? "LinkedIn" : "Email", status:"Sent", sent:now,
+      ...(act === "em" ? {address:p.emailGuess || ""} : {profile:p.profileUrl || ""}), notes:p.why || ""});
+  }
+  p.status = act === "skip" ? "Skipped" : "Contacted"; render();
+  if (db) try { await db.collection("prospects").doc(id).update({status:p.status}); } catch(e){ setSave(false, "Not saved, try again"); }
+}
+
+async function runCheck(k){
+  const s = SRC[k], note = $("tri-note-" + k);
+  if (!mcp){ note.hidden = false; note.className = "tri-note err"; note.textContent = `The button works when this page is open in claude.ai. You can also say "${s.btn.toLowerCase()}" in the Out Reach project.`; return; }
+  tri[k].req = new Date().toISOString(); renderTriage(k);
+  try {
+    await mcp.callTool("Claude Code Remote","fire_trigger",{trigger_id: s.trigger});
+    if (db) db.doc(s.run).set({requestedAt: tri[k].req}).catch(() => {});
+  } catch(e){
+    tri[k].req = null; renderTriage(k);
+    note.hidden = false; note.className = "tri-note err";
+    note.textContent = e.code === "server_not_connected" || e.code === "needs_reauth" ? "Connect Claude Code Remote in claude.ai Settings → Connectors, then try again."
+      : e.code === "not_in_manifest" || e.code === "approval_required" ? "The page needs your OK to start the check. Press the button again and allow it."
+      : "Couldn't start the check. Try again in a minute.";
+  }
+}
+document.addEventListener("click", async e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.run) runCheck(t.dataset.run);
+  else if (t.dataset.msent) markSent(t.dataset.msent);
+  else if (t.dataset.fudone) write("outreach", t.dataset.fudone, {followedUp: today0(), lastContact: today0()});
+  else if (t.dataset.atype !== undefined){ ui.applications.type = t.dataset.atype || null; render(); }
+  else if (t.dataset.tsel){ const [k,b] = t.dataset.tsel.split(":"); triSel[k] = b; render(); }
+  else if (t.dataset.pact) prospectAction(t.dataset.pact, t.dataset.pid);
+  else if (t.dataset.oact) write("outreach", t.dataset.pid, {address: state.outreach.find(r => r.id === t.dataset.pid)?.emailGuess || ""});
+  else if (t.dataset.copy || t.dataset.copytext !== undefined){
+    const text = t.dataset.copy ? drafts.get(t.dataset.copy) : t.dataset.copytext;
+    try { await navigator.clipboard.writeText(text); t.textContent = "Copied"; t.classList.add("ok"); setTimeout(() => { t.textContent = "Copy"; t.classList.remove("ok"); }, 1500); }
+    catch(err){ const pre = t.closest(".draft")?.querySelector("pre") || t.previousElementSibling; if (pre){ const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); } t.textContent = "Selected, press ⌘C"; }
+  }
+});
+
+/* ---------- boot ---------- */
+show((location.hash || "").slice(1));
+(async () => { mcp = await window.claude?.use?.("mcp"); })();
+(async () => {
+  db = await window.claude?.use?.("db");
+  if (!db){ setSave(false, "Offline view, edits are not kept"); return; }
+  setSave(true, "Saved automatically");
+  ["applications","outreach"].forEach(kind => {
+    db.collection(kind).onSnapshot(snap => { state[kind] = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); },
+      () => setSave(false, "Lost connection, reload to retry"));
+  });
+  db.doc("triage/done").onSnapshot(x => { doneMap = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
+  db.collection("prospects").onSnapshot(snap => { prospects = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); }, () => {});
+  Object.entries(SRC).forEach(([k, s]) => {
+    db.doc(s.doc).onSnapshot(x => { tri[k].data = x.exists ? x.data() : null; if (k === "li") triage = tri.li.data; render(); }, () => {});
+    db.doc(s.run).onSnapshot(x => { if (x.exists){ const r = x.data().requestedAt; if (!tri[k].req || r > tri[k].req) tri[k].req = r; } render(); }, () => {});
+  });
+})();
+</script>
