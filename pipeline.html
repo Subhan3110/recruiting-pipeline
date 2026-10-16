@@ -1,9 +1,9 @@
 <title>Recruiting Pipeline</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-/* Layout: header + four top tabs (Overview, LinkedIn, Email, Applications); each tab is one working column. */
+/* Recruiting workspace — responsive navigation with six views, including a document vault. */
 :root{
   --bg:#F4F6F8; --surface:#FFFFFF; --ink:#13203A; --muted:#5D6B82; --line:#DCE2EA; --soft:#EAEEF3;
   --accent:#2B50C8; --accent-ink:#FFFFFF;
@@ -293,15 +293,223 @@ a.mail:hover{text-decoration:underline}
 .company-form textarea{resize:vertical;width:100%;box-sizing:border-box}
 .company-form input{width:100%;box-sizing:border-box}
 @media(max-width:760px){.company-columns{grid-template-columns:1fr}}
+
+/* ─────────────────────────────────────────────────────────────
+   THEME / QUIET PRECISION
+   Ink, frost and electric blue. Visual hierarchy over decoration.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --bg:#F6F8FB; --surface:#FFFFFF; --ink:#1B2940; --muted:#657389; --line:#E0E6EF; --soft:#EFF3F9;
+  --accent:#254DD7; --accent-ink:#FFFFFF; --ring:#DDE6FF; --shadow:0 3px 16px rgba(21,41,77,.035);
+  --display:"Manrope",system-ui,sans-serif;
+}
+:root[data-theme="dark"]{
+  --bg:#101725; --surface:#182235; --ink:#EFF4FB; --muted:#A3AEC2; --line:#2F3C52; --soft:#222E41;
+  --accent:#8CA7FF; --accent-ink:#111B2D; --ring:#2A3E65; --shadow:0 4px 20px rgba(0,0,0,.12);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#101725; --surface:#182235; --ink:#EFF4FB; --muted:#A3AEC2; --line:#2F3C52; --soft:#222E41;
+    --accent:#8CA7FF; --accent-ink:#111B2D; --ring:#2A3E65; --shadow:0 4px 20px rgba(0,0,0,.12);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;padding-block:0 76px;gap:0;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
+header{padding:26px 0 22px;align-items:center;gap:18px}
+.brand-lockup{display:flex;align-items:center;gap:13px;min-width:0}
+.brand-mark{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:13px;
+  background:var(--ink);color:var(--surface);font:800 21px/1 var(--display);letter-spacing:-.08em;position:relative;overflow:hidden}
+.brand-mark::after{content:"";position:absolute;width:21px;height:21px;right:-11px;top:-10px;background:var(--accent);transform:rotate(40deg)}
+header .eyebrow{font-size:10px;letter-spacing:.11em;color:var(--muted);font-weight:500}
+.eyebrow-dot{padding:0 5px;color:var(--accent)}
+h1{font-family:var(--display);font-size:24px;font-weight:800;letter-spacing:-.055em;line-height:1.15;font-stretch:normal}
+.brand-period{color:var(--accent)}
+.header-right{display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:flex-end}
+.header-cycle{font:500 10px var(--mono);letter-spacing:.06em;color:var(--muted);white-space:nowrap}
+.header-cycle span{color:var(--accent);padding:0 4px}
+.save{border:1px solid var(--line);padding:7px 10px;border-radius:20px;background:var(--surface);font-size:10px;white-space:nowrap}
+.save b{margin-right:4px}
+nav.top{position:sticky;top:0;z-index:10;gap:3px;border:1px solid var(--line);background:var(--surface);
+  border-radius:12px;padding:5px;box-shadow:var(--shadow);margin-bottom:28px;scrollbar-width:none;overflow-x:auto}
+nav.top::-webkit-scrollbar{display:none}
+.ttab{position:relative;margin:0;border:0;border-radius:8px;padding:10px 17px;font:600 12px var(--body);transition:background .16s,color .16s}
+.ttab:hover{background:var(--soft)}
+.ttab[aria-selected="true"]{color:var(--accent);background:var(--ring);border:0}
+.ttab span{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.ttab.profile-tab{margin-left:auto}
+.view{gap:24px}
+.view[hidden]{display:none!important}
+h2.sec{font-family:var(--display);font-size:15px;font-weight:800;letter-spacing:-.025em;margin-bottom:12px;align-items:center}
+h2.sec span{font-size:12px;font-weight:400;letter-spacing:0}
+.overview-intro{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:0 1px 4px}
+.section-eyebrow{display:block;font:500 10px var(--mono);color:var(--accent);letter-spacing:.13em;text-transform:uppercase;margin-bottom:9px}
+.overview-intro h2,.profile-hero h2{font:800 clamp(24px,3vw,32px)/1.18 var(--display);letter-spacing:-.045em;margin:0}
+.overview-intro h2 span{color:var(--accent)}
+.overview-intro p,.profile-hero p{font-size:13px;margin:9px 0 0;color:var(--muted)}
+.overview-actions{display:flex;flex-wrap:wrap;gap:9px}
+.btn{border-radius:7px;font-size:12px;font-weight:600;padding:9px 13px;transition:background .16s,border-color .16s,transform .16s}
+.btn:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px)}
+.btn.primary{box-shadow:0 2px 8px rgba(35,71,164,.12)}
+input,select,textarea{border-radius:7px;border-color:var(--line);min-height:33px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
+.kpis,.kpis.k4{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--surface);
+  box-shadow:var(--shadow)}
+.kpi,.kpi+.kpi{padding:15px 18px;border:0}
+.kpi+.kpi{border-left:1px solid var(--line)}
+.kpi .n{font:800 28px/1.1 var(--display);letter-spacing:-.04em}
+.kpi .l{font-size:11px;line-height:1.4}
+.sources{gap:14px}
+.src{border-radius:11px;box-shadow:var(--shadow);padding:19px;transition:border-color .16s,transform .16s,box-shadow .16s}
+.src:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 9px 26px rgba(21,41,77,.07)}
+.src .h strong{font:800 15px var(--display)}
+.src .h span{font-size:11px}
+.src .big{font:800 30px var(--display)}
+.src .big small{font:400 11px var(--body)}
+.src dl{font-size:12px;gap:6px}
+.panel-box,.fun,.tablewrap,.ilist{border-radius:10px;box-shadow:var(--shadow)}
+.panel-box{padding:20px}
+.fun{padding:18px}
+.fun .fhead b{font:800 29px var(--display)}
+.fun .bar{border-radius:4px}
+.cat{border-left:0;border-radius:9px;box-shadow:var(--shadow)}
+.cat > summary{padding:11px 15px}
+.cat > summary::before{border-color:var(--accent);width:7px;height:7px}
+.cat .cl{font-size:13px}
+.cat b{font-size:13px}
+.it summary{padding-top:10px;padding-bottom:10px}
+.it[open] summary{background:var(--soft)}
+.it .body{padding:12px 15px 16px}
+.tag{border-radius:5px;padding:2px 6px;font-size:9px;letter-spacing:.025em}
+.chip{padding:6px 11px;border-radius:7px}
+.chip[aria-pressed="true"]{color:var(--accent);background:var(--ring);border-color:var(--ring)}
+td{padding:9px 12px}
+th{padding:11px 12px;background:var(--soft)}
+tr:hover td{background:color-mix(in srgb,var(--soft) 38%,var(--surface))}
+.rowbtn{font-size:11px;font-weight:600}
+.pill select{font-size:11px;padding:4px 23px 4px 21px}
+.tri-head h2{font:800 20px var(--display);letter-spacing:-.03em}
+.tri-meta{font-size:11px;line-height:1.55}
+.ai-card{border-radius:8px;padding:15px}
+.company-card{border-radius:10px;padding:18px;transition:border-color .16s,transform .16s}
+.company-card:hover{transform:translateY(-2px)}
+.company-card strong{font:800 15px var(--display)}
+.company-line{padding:12px 0}
+.sheet{background:rgba(17,29,47,.45);backdrop-filter:blur(4px)}
+.panel{border-radius:14px;padding:24px;box-shadow:0 16px 70px rgba(0,0,0,.15)}
+.panel h3{font:800 19px var(--display)}
+.empty-note{line-height:1.6}
+@media(max-width:900px){.header-cycle{display:none}.overview-intro{align-items:flex-start;flex-direction:column}}
+@media(max-width:720px){
+  .wrap{padding-left:15px;padding-right:15px}
+  header{padding:18px 0 15px}
+  .brand-mark{width:36px;height:36px;border-radius:10px;font-size:19px}
+  h1{font-size:20px}
+  .header-right{gap:6px}
+  .header-right .header-add{display:none}
+  nav.top{top:0;border-radius:9px;margin-bottom:20px}
+  .ttab{padding:9px 12px}
+  .ttab.profile-tab{margin-left:0}
+  .kpis,.kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi,.kpi+.kpi{border-bottom:1px solid var(--line);padding:13px 15px}
+  .kpi:nth-child(odd){border-left:0}
+  .kpi:nth-child(even){border-left:1px solid var(--line)}
+  .kpi .n{font-size:25px}
+  .view{gap:20px}
+  .panel-box{padding:16px}
+}
+@media(max-width:450px){.save{font-size:9px}.header-right{justify-content:flex-start}.overview-actions{width:100%}.overview-actions .btn{flex:1}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
+
+/* ─── PROFILE / DOCUMENT LIBRARY ─── */
+.profile-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:23px 26px;
+  border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
+.profile-avatar{width:58px;height:58px;border-radius:15px;background:var(--ink);color:var(--surface);
+  display:grid;place-items:center;font:800 23px var(--display);flex:none}
+.profile-hero-text{flex:1;min-width:0}
+.profile-hero h2{font-size:26px}
+.profile-hero .subtitle{font-size:12px;color:var(--muted);margin-top:5px}
+.profile-hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+.profile-hero-right strong{font:800 24px var(--display)}
+.profile-hero-right small{font:11px var(--mono);color:var(--muted)}
+.profile-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(260px,.75fr);gap:16px;align-items:start}
+.profile-side{display:grid;gap:16px;align-content:start}
+.profile-panel-title{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;margin-bottom:15px;border-bottom:1px solid var(--line)}
+.profile-panel-title h3{font:800 15px var(--display);letter-spacing:-.02em;margin:0}
+.profile-panel-title span{font:11px var(--mono);color:var(--muted)}
+.profile-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.profile-form label{gap:5px}
+.profile-form label.wide{grid-column:1/-1}
+.profile-form input,.profile-form textarea{width:100%;box-sizing:border-box}
+.profile-form .actions{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:4px}
+.profile-form .actions .tri-meta{max-width:260px}
+.profile-brief{white-space:pre-wrap;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.profile-tip{font-size:12px;color:var(--muted);line-height:1.7;margin:0}
+.profile-tip strong{color:var(--ink)}
+.profile-tip + .profile-tip{margin-top:9px}
+.profile-primary{display:grid;gap:10px}
+.profile-primary .primary-icon{display:grid;place-items:center;width:43px;height:51px;border-radius:7px;background:var(--ring);color:var(--accent);font:800 12px var(--mono)}
+.profile-primary strong{font:800 14px var(--display);overflow-wrap:anywhere}
+.profile-primary small{font-size:12px;color:var(--muted)}
+.profile-primary .acts{display:flex;gap:8px;flex-wrap:wrap}
+.doc-section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.doc-section-head h2{font:800 20px var(--display);letter-spacing:-.035em;margin:0}
+.doc-section-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.doc-action-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+.doc-action-box{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:19px;box-shadow:var(--shadow);min-width:0}
+.doc-action-box h3{font:800 14px var(--display);margin:0 0 6px}
+.doc-action-box p{font-size:11px;color:var(--muted);line-height:1.6;margin:0 0 12px}
+.doc-upload-input{position:absolute!important;width:1px;height:1px;opacity:0;overflow:hidden}
+.doc-upload-label{min-height:117px;display:flex;align-items:center;justify-content:center;flex-direction:column;
+  gap:7px;border:1.5px dashed var(--line);border-radius:9px;cursor:pointer;background:var(--bg);text-align:center;padding:15px}
+.doc-upload-label:hover,.doc-upload-input:focus-visible+.doc-upload-label{border-color:var(--accent);background:var(--ring)}
+.doc-upload-label .up-symbol{color:var(--accent);font-size:25px;line-height:1}
+.doc-upload-label strong{font-size:13px}
+.doc-upload-label small{font-size:11px;color:var(--muted)}
+.doc-link-form{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.doc-link-form label{min-width:0}
+.doc-link-form label.wide{grid-column:1/-1}
+.doc-link-form input,.doc-link-form select{width:100%}
+.doc-link-form .btn{grid-column:1/-1;justify-self:start}
+.doc-filter-row{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.doc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.doc-card{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;padding:16px;min-width:0;box-shadow:var(--shadow)}
+.doc-card-top{display:flex;align-items:flex-start;gap:10px}
+.doc-card-icon{width:36px;height:42px;background:var(--soft);color:var(--accent);border-radius:7px;
+  display:grid;place-items:center;font:700 11px var(--mono);flex:none}
+.doc-card-title{font:800 13px/1.4 var(--display);overflow-wrap:anywhere}
+.doc-card-meta{font:11px/1.5 var(--mono);color:var(--muted)}
+.doc-card-notes{color:var(--muted);font-size:12px;overflow-wrap:anywhere;line-height:1.55}
+.doc-card-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:auto;padding-top:7px}
+.doc-card-actions .btn{padding:6px 10px}
+.doc-card-actions .btn.danger{margin-left:auto}
+.doc-badge{display:inline-flex;border-radius:5px;padding:3px 7px;font:500 10px var(--mono);
+  background:var(--soft);color:var(--muted);align-self:start}
+.doc-badge.local{background:var(--ring);color:var(--accent)}
+.doc-alert{font-size:12px;color:var(--muted);line-height:1.6;background:var(--soft);padding:10px 12px;border-radius:8px}
+.doc-alert[hidden]{display:none}
+.doc-empty{padding:30px;text-align:center;background:var(--surface);border:1px dashed var(--line);border-radius:10px;color:var(--muted);font-size:13px}
+@media(max-width:900px){.profile-layout{grid-template-columns:1fr}.profile-side{grid-template-columns:1fr 1fr}.profile-hero-right{display:none}}
+@media(max-width:650px){.profile-side,.doc-action-grid{grid-template-columns:1fr}.profile-form{grid-template-columns:1fr}.profile-form label.wide{grid-column:auto}.profile-hero{padding:18px}.doc-action-box{padding:15px}}
+
 </style>
 
 <div class="wrap">
   <header>
-    <div>
-      <div class="eyebrow">2027 summer cycle · London &amp; Oslo</div>
-      <h1>Recruiting Pipeline</h1>
+    <div class="brand-lockup">
+      <div class="brand-mark" aria-hidden="true">R</div>
+      <div>
+        <div class="eyebrow">RECRUITING WORKSPACE <span class="eyebrow-dot">/</span> 2027 CYCLE</div>
+        <h1>Pipeline<span class="brand-period">.</span></h1>
+      </div>
     </div>
-    <div class="save" id="save"><b>●</b> Connecting…</div>
+    <div class="header-right">
+      <span class="header-cycle">LONDON <span>↔</span> OSLO</span>
+      <button class="btn header-add" data-add="applications" type="button">+ New application</button>
+      <div class="save" id="save" role="status" aria-live="polite"><b>●</b> Connecting…</div>
+    </div>
   </header>
 
   <nav class="top" role="tablist" aria-label="Sections">
@@ -310,10 +518,22 @@ a.mail:hover{text-decoration:underline}
     <button class="ttab" role="tab" data-view="email">Email<span id="c-em"></span></button>
     <button class="ttab" role="tab" data-view="applications">Applications<span id="c-ap"></span></button>
     <button class="ttab" role="tab" data-view="companies">Companies</button>
+    <button class="ttab profile-tab" role="tab" data-view="profile">Profile &amp; Docs</button>
   </nav>
 
   <!-- OVERVIEW -->
   <section class="view" id="v-overview">
+    <div class="overview-intro">
+      <div>
+        <span class="section-eyebrow">YOUR WORKSPACE · 2027</span>
+        <h2>Stay ahead of the process<span>.</span></h2>
+        <p>Every application, conversation and next step in one place.</p>
+      </div>
+      <div class="overview-actions">
+        <button class="btn primary" data-add="applications" type="button">+ Add application</button>
+        <button class="btn" data-view="profile" type="button">Your documents ↗</button>
+      </div>
+    </div>
     <div class="kpis">
       <div class="kpi"><span class="n" id="k-out">0</span><span class="l">Total outreach</span></div>
       <div class="kpi"><span class="n" id="k-reply">–</span><span class="l">Reply rate</span></div>
@@ -395,6 +615,90 @@ a.mail:hover{text-decoration:underline}
     <div class="tri-head"><div><h2>Company profiles</h2><p class="tri-meta">Applications, LinkedIn, email contacts and prospects in one place. Add aliases to join different company names.</p></div></div>
     <div id="companies-root" class="stack"></div>
   </section>
+
+  <!-- PROFILE AND DOCUMENTS -->
+  <section class="view" id="v-profile" hidden>
+    <div class="profile-hero">
+      <div class="profile-avatar" id="profile-avatar">P</div>
+      <div class="profile-hero-text">
+        <span class="section-eyebrow">YOUR RECRUITING IDENTITY</span>
+        <h2 id="profile-display-name">Profile &amp; documents</h2>
+        <div class="subtitle" id="profile-display-subtitle">Keep your details, CV and supporting documents ready when an opportunity moves forward.</div>
+      </div>
+      <div class="profile-hero-right"><strong id="profile-doc-count">0</strong><small>DOCUMENTS READY</small></div>
+    </div>
+
+    <div class="profile-layout">
+      <div class="panel-box">
+        <div class="profile-panel-title"><h3>Personal details</h3><span>Synced via Claude DB</span></div>
+        <form id="profile-form" class="profile-form">
+          <label>Full name<input name="name" autocomplete="name" maxlength="150" placeholder="Your name"></label>
+          <label>Email<input name="email" type="email" autocomplete="email" maxlength="220" placeholder="you@example.com"></label>
+          <label>Phone<input name="phone" type="tel" autocomplete="tel" maxlength="80" placeholder="+44 ..."></label>
+          <label>Location<input name="location" maxlength="150" placeholder="London / Oslo"></label>
+          <label class="wide">Current programme / headline<input name="headline" maxlength="250" placeholder="MSc Finance · Imperial College London"></label>
+          <label class="wide">LinkedIn profile<input name="linkedin" type="url" maxlength="600" placeholder="https://www.linkedin.com/in/..."></label>
+          <label class="wide">Short profile / key talking points<textarea name="summary" rows="4" maxlength="3000" placeholder="Experience, target teams, strengths and points you regularly use in applications..."></textarea></label>
+          <div class="actions">
+            <button class="btn primary" type="submit" id="profile-save-btn">Save details</button>
+            <span class="tri-meta" id="profile-save-note" aria-live="polite"></span>
+          </div>
+        </form>
+      </div>
+      <aside class="profile-side">
+        <div class="panel-box">
+          <div class="profile-panel-title"><h3>Latest CV</h3><span>Quick access</span></div>
+          <div id="profile-primary" class="profile-primary"><p class="empty-note">Add your CV below to see it here.</p></div>
+        </div>
+        <div class="panel-box">
+          <div class="profile-panel-title"><h3>Reusable candidate brief</h3><span>AI-ready</span></div>
+          <p class="profile-tip">Copy your profile details and synced document links into Claude, ChatGPT or another AI when preparing an application.</p>
+          <div class="acts" style="margin-top:13px"><button class="btn" id="profile-copy-brief" type="button">Copy candidate brief ↗</button></div>
+          <p class="tri-meta" id="profile-brief-note" aria-live="polite"></p>
+        </div>
+        <div class="panel-box">
+          <div class="profile-panel-title"><h3>Storage guide</h3><span>Important</span></div>
+          <p class="profile-tip"><strong>Synced links:</strong> URLs and titles are saved in the Claude Artifact database. Files remain hosted where you put them (e.g. Drive).</p>
+          <p class="profile-tip"><strong>Local uploads:</strong> Files stay in this browser, not on GitHub or in Claude DB. They will not appear on other devices.</p>
+        </div>
+      </aside>
+    </div>
+
+    <div class="doc-section-head">
+      <div><span class="section-eyebrow">YOUR LIBRARY</span><h2>Documents, ready when needed</h2>
+        <p>CV versions, cover letters, transcripts, references and supporting documents.</p></div>
+      <span class="doc-badge" id="doc-library-count">0 documents</span>
+    </div>
+    <div class="doc-action-grid">
+      <div class="doc-action-box">
+        <h3>Upload a file</h3>
+        <p>Quick access on this device only. PDF, DOC, DOCX, TXT or images · up to 10 MB each.</p>
+        <input class="doc-upload-input" id="profile-file-upload" type="file" multiple accept=".pdf,.doc,.docx,.txt,.rtf,.png,.jpg,.jpeg,application/pdf">
+        <label for="profile-file-upload" class="doc-upload-label">
+          <span class="up-symbol">↑</span><strong>Choose files to keep handy</strong>
+          <small>Stored locally in this browser · not cloud-synced</small>
+        </label>
+        <p class="tri-meta" id="doc-upload-note" role="status" style="margin-top:9px"></p>
+      </div>
+      <div class="doc-action-box">
+        <h3>Add a synced document link</h3>
+        <p>Link to a file in Google Drive, OneDrive or another HTTPS location. Metadata syncs via Claude.</p>
+        <form id="profile-link-form" class="doc-link-form">
+          <label class="wide">Document name<input name="title" maxlength="200" placeholder="CV – Investment Banking 2027" required></label>
+          <label>Category<select name="category">
+            <option>CV</option><option>Cover letter</option><option>Transcript</option><option>References</option><option>Certificate</option><option>Other</option>
+          </select></label>
+          <label>Version / note<input name="version" maxlength="120" placeholder="Oct 2026 · London"></label>
+          <label class="wide">HTTPS document link<input name="url" type="url" placeholder="https://drive.google.com/..." required></label>
+          <button class="btn primary" type="submit">Save document link</button>
+        </form>
+        <p class="tri-meta" id="doc-link-note" role="status" style="margin-top:9px"></p>
+      </div>
+    </div>
+    <p class="doc-alert" id="doc-storage-alert" hidden></p>
+    <div class="doc-filter-row" id="profile-doc-filters"></div>
+    <div class="doc-list" id="profile-document-list" aria-live="polite"></div>
+  </section>
 </div>
 
 <div class="sheet" id="sheet" hidden>
@@ -423,7 +727,7 @@ const live = new Set(["Applied","Online test","HireVue","Interview"]);
 const replied = new Set(["Replied","Call booked","Call done","Declined"]);
 const contacted = new Set(["Sent","Replied","Call booked","Call done","No reply","Declined"]);
 const met = new Set(["Call booked","Call done"]);
-const VIEWS = ["overview","linkedin","email","applications","companies"];
+const VIEWS = ["overview","linkedin","email","applications","companies","profile"];
 
 let state = {applications:[], outreach:[]};
 let view = "overview", db = null, mcp = null, editing = null;
@@ -680,6 +984,242 @@ document.addEventListener("click",e=>{
   else if(b.dataset.aiApply){const card=b.closest("[data-suggestion-card]");decideSuggestion(b.dataset.aiApply,"apply",card?.querySelector("select")?.value);}
   else if(b.dataset.aiDismiss)decideSuggestion(b.dataset.aiDismiss,"dismiss","");
 });
+/* ─────────────────────────────────────────────────────────────
+   PROFILE: DB-sync metadata + browser-local file attachments
+   ───────────────────────────────────────────────────────────── */
+let candidateProfile = {name:"",email:"",phone:"",location:"",headline:"",linkedin:"",summary:""};
+let syncedDocuments = [], localDocuments = [];
+let documentFilter = "All", profileStorageError = "", localDocsDB = null;
+const DOCUMENT_CATEGORIES = ["CV","Cover letter","Transcript","References","Certificate","Other"];
+const MAX_LOCAL_FILE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_LOCAL_EXT = /\.(pdf|doc|docx|txt|rtf|png|jpe?g)$/i;
+
+function httpsLink(input){
+  try { const u = new URL(String(input||"").trim()); 
+    return u.protocol==="https:" && !u.username && !u.password && u.hostname ? u.href : "";
+  } catch(_){ return ""; }
+}
+function docDate(v){
+  const d=new Date(v||0);
+  return Number.isFinite(d.valueOf()) ? d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "Undated";
+}
+function docLabel(file){
+  const x=(file.title||file.name||"Document").split(".");
+  return x.length>1 && x[x.length-1].length<6 ? x[x.length-1].toUpperCase().slice(0,4) : (file.category==="CV"?"CV":"DOC");
+}
+function allProfileDocuments(){
+  return [
+    ...syncedDocuments.map(d=>({...d,storage:"synced"})),
+    ...localDocuments.map(d=>({...d,storage:"local"}))
+  ].sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")));
+}
+function renderProfile(){
+  const p=candidateProfile, documents=allProfileDocuments();
+  $("profile-avatar").textContent = String(p.name||"P").trim().split(/\s+/).slice(0,2).map(x=>x[0]?.toUpperCase()||"").join("")||"P";
+  $("profile-display-name").textContent=p.name||"Profile & documents";
+  $("profile-display-subtitle").textContent=p.headline||"Keep your details, CV and supporting documents ready when an opportunity moves forward.";
+  $("profile-doc-count").textContent=String(documents.length);
+  $("doc-library-count").textContent=documents.length+" document"+(documents.length===1?"":"s");
+  const profileForm=$("profile-form");
+  if(profileForm && !profileForm.matches(":focus-within")){
+    for(const el of profileForm.elements){
+      if(el.name && Object.prototype.hasOwnProperty.call(p,el.name))el.value=p[el.name]||"";
+    }
+  }
+  const topCV=documents.find(d=>d.category==="CV");
+  $("profile-primary").innerHTML=topCV ?
+    `<div class="doc-card-top"><span class="primary-icon">PDF</span>
+    <div><strong>${esc(topCV.title||topCV.fileName||"Curriculum vitae")}</strong><br>
+    <small>${esc(topCV.version||"Latest version")} · ${esc(docDate(topCV.updatedAt))}</small></div></div>
+    <span class="doc-badge ${topCV.storage==="local"?"local":""}">${topCV.storage==="local"?"Stored on this device":"Synced document link"}</span>
+    <div class="acts">${topCV.storage==="local"
+      ? `<button class="btn primary" data-doc-download="${esc(topCV.id)}">Download CV</button>`
+      : `<a class="btn primary" href="${esc(httpsLink(topCV.url))}" target="_blank" rel="noopener noreferrer">Open CV ↗</a>`}</div>` :
+    `<p class="empty-note">No CV added yet. Upload a file below or link to your latest version.</p>`;
+  const filters=["All",...DOCUMENT_CATEGORIES];
+  $("profile-doc-filters").innerHTML=filters.map(f=>
+    `<button class="chip" type="button" data-doc-filter="${esc(f)}" aria-pressed="${f===documentFilter}">${esc(f)}${f==="All"?" · "+documents.length:""}</button>`
+  ).join("");
+  const visible=documents.filter(d=>documentFilter==="All"||d.category===documentFilter);
+  $("profile-document-list").innerHTML=visible.length ? visible.map(d=>{
+    const synced=d.storage==="synced";
+    const note=String(d.version||d.notes||"");
+    return `<article class="doc-card">
+      <div class="doc-card-top"><span class="doc-card-icon">${esc(docLabel(d))}</span>
+        <div style="min-width:0"><div class="doc-card-title">${esc(d.title||d.fileName||"Document")}</div>
+        <div class="doc-card-meta">${esc(d.category||"Other")} · ${esc(docDate(d.updatedAt))}</div></div>
+      </div>
+      <span class="doc-badge ${synced?"":"local"}">${synced?"Synced link":"Local file · this browser"}</span>
+      ${note?`<div class="doc-card-notes">${esc(note)}</div>`:""}
+      <div class="doc-card-actions">
+        ${synced
+          ? `<a class="btn primary" href="${esc(httpsLink(d.url))}" target="_blank" rel="noopener noreferrer">Open ↗</a><button class="btn" data-doc-copy="${esc(d.id)}">Copy link</button>`
+          : `<button class="btn primary" data-doc-download="${esc(d.id)}">Download</button>`}
+        <button class="btn danger" data-doc-delete="${esc(d.id)}" data-doc-storage="${d.storage}" aria-label="Remove ${esc(d.title||d.fileName||"document")}">Remove</button>
+      </div>
+    </article>`;
+  }).join(""):`<div class="doc-empty">No ${documentFilter==="All"?"documents":documentFilter.toLowerCase()+" documents"} yet.<br>Upload a file or save a cloud link above.</div>`;
+  const alert=$("doc-storage-alert");
+  alert.hidden=!profileStorageError;
+  if(profileStorageError)alert.textContent=profileStorageError+" Use synced HTTPS document links instead.";
+}
+function candidateBrief(){
+  const p=candidateProfile;
+  const rows=[
+    "RECRUITING CANDIDATE BRIEF",
+    "Name: "+(p.name||"(not set)"),
+    "Programme: "+(p.headline||"(not set)"),
+    "Location: "+(p.location||"(not set)"),
+    "Email: "+(p.email||"(not set)"),
+    "Phone: "+(p.phone||"(not set)"),
+    "LinkedIn: "+(p.linkedin||"(not set)"),
+    "Experience / talking points: "+(p.summary||"(not set)"),
+    "",
+    "DOCUMENT LINKS (access permissions may apply)"
+  ];
+  for(const d of syncedDocuments) if(httpsLink(d.url))rows.push(`${d.category||"Other"} — ${d.title||"Document"}${d.version?" ("+d.version+")":""}: ${d.url}`);
+  if(!syncedDocuments.length)rows.push("(No synced document links yet)");
+  rows.push("Note: Local uploads are not included; they stay on this device.");
+  return rows.join("\n");
+}
+function localDocumentId(){
+  return "local-"+(globalThis.crypto?.randomUUID?.() || (Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)));
+}
+function connectLocalDocuments(){
+  return new Promise((resolve,reject)=>{
+    if(!globalThis.indexedDB){reject(new Error("This browser does not support local file storage."));return;}
+    let request;
+    try{request=indexedDB.open("recruiting-pipeline-documents",1);}
+    catch(e){reject(e);return;}
+    request.onupgradeneeded=()=>{const conn=request.result; if(!conn.objectStoreNames.contains("files"))conn.createObjectStore("files",{keyPath:"id"});};
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error("IndexedDB unavailable"));
+  });
+}
+function idbOperation(mode,task){
+  return new Promise((resolve,reject)=>{
+    if(!localDocsDB){reject(new Error("Local storage is unavailable."));return;}
+    let tx,request;
+    try{tx=localDocsDB.transaction("files",mode);request=task(tx.objectStore("files"));}
+    catch(e){reject(e);return;}
+    if(request){
+      request.onsuccess=()=>resolve(request.result);
+      request.onerror=()=>reject(request.error||new Error("Local storage error"));
+    } else {
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error||new Error("Local storage error"));
+      tx.onabort=()=>reject(tx.error||new Error("Local storage interrupted"));
+    }
+  });
+}
+async function loadLocalDocuments(){
+  try{
+    localDocsDB=await connectLocalDocuments();
+    const items=await idbOperation("readonly",store=>store.getAll());
+    localDocuments=items.map(({blob,...metadata})=>metadata);
+    render();
+  }catch(e){
+    profileStorageError="Local file storage is unavailable in this browser or the Artifact frame.";
+    if(view==="profile")render();
+  }
+}
+async function saveLocalFiles(fileList){
+  const note=$("doc-upload-note");let imported=0;
+  if(!localDocsDB){note.textContent="Local file storage is not available here. Use a synced document link.";return;}
+  for(const f of [...fileList]){
+    if(!ALLOWED_LOCAL_EXT.test(f.name)||f.size>MAX_LOCAL_FILE_BYTES||f.size===0){
+      note.textContent=`Skipped ${f.name}: unsupported format, empty file or over 10 MB.`; continue;
+    }
+    const category=/\b(cv|curriculum|resume|résumé)\b/i.test(f.name)?"CV":/transcript|grades|vitnemål/i.test(f.name)?"Transcript":
+      /cover|motivation|søknad/i.test(f.name)?"Cover letter":/reference|recommendation/i.test(f.name)?"References":
+      /certificate|diploma/i.test(f.name)?"Certificate":"Other";
+    const item={id:localDocumentId(),title:f.name.replace(/\.[^.]+$/,""),fileName:f.name,
+      category,version:"",updatedAt:new Date().toISOString(),blob:f};
+    try{
+      await idbOperation("readwrite",store=>store.put(item));
+      const {blob,...metadata}=item;localDocuments.push(metadata);imported++;
+    }catch(e){
+      profileStorageError="File couldn't be stored locally. Browser storage may be restricted or full.";
+      note.textContent=profileStorageError;break;
+    }
+  }
+  if(imported)note.textContent=`${imported} file${imported===1?"":"s"} saved in this browser (not synced).`;
+  render();
+}
+async function downloadLocalDocument(id){
+  const row=localDocuments.find(d=>d.id===id);if(!row)return;
+  try{
+    const item=await idbOperation("readonly",store=>store.get(id));
+    if(!item?.blob)throw new Error("File missing");
+    const url=URL.createObjectURL(item.blob), a=document.createElement("a");
+    a.href=url;a.download=row.fileName||"document";document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }catch(e){$("doc-upload-note").textContent="Could not download this local file.";}
+}
+async function removeProfileDocument(id,storage){
+  const doc=(storage==="local"?localDocuments:syncedDocuments).find(d=>d.id===id);
+  if(!doc||!confirm(`Remove "${doc.title||doc.fileName||"document"}" from this library?`))return;
+  try{
+    if(storage==="local"){
+      await idbOperation("readwrite",store=>store.delete(id));
+      localDocuments=localDocuments.filter(d=>d.id!==id);
+    } else {
+      if(db)await db.collection("profile_documents").doc(id).delete();
+      syncedDocuments=syncedDocuments.filter(d=>d.id!==id);
+    }
+    render();
+  }catch(e){$("doc-link-note").textContent="Remove failed. Please try again.";}
+}
+document.addEventListener("submit",async e=>{
+  if(e.target.id!=="profile-form"&&e.target.id!=="profile-link-form")return;
+  e.preventDefault();
+  if(e.target.id==="profile-form"){
+    const fd=new FormData(e.target),note=$("profile-save-note");
+    const data={};for(const k of ["name","email","phone","location","headline","linkedin","summary"])data[k]=String(fd.get(k)||"").trim();
+    if(data.linkedin&&!httpsLink(data.linkedin)){note.textContent="LinkedIn address must be a valid HTTPS URL.";return;}
+    data.updatedAt=new Date().toISOString();
+    try{
+      if(db)await db.doc("profile/main").set(data);
+      candidateProfile={...data};
+      note.textContent=db?"Saved and synced.":"Preview only. Details are not saved.";
+      render();
+    }catch(err){note.textContent="Could not save your profile. Try again.";setSave(false,"Profile save failed");}
+    return;
+  }
+  const fd=new FormData(e.target),note=$("doc-link-note");
+  const title=String(fd.get("title")||"").trim(),url=httpsLink(fd.get("url")),category=String(fd.get("category")||"Other");
+  if(!title||!url){note.textContent="Add a title and a valid HTTPS URL.";return;}
+  if(!DOCUMENT_CATEGORIES.includes(category)){note.textContent="Invalid document category.";return;}
+  const data={title,category,url,version:String(fd.get("version")||"").trim(),updatedAt:new Date().toISOString()};
+  const id="link-"+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36));
+  try{
+    if(db)await db.collection("profile_documents").doc(id).set(data);
+    syncedDocuments.push({id,...data});
+    e.target.reset();documentFilter="All";render();
+    note.textContent=db?"Document link saved and synced.":"Added for preview only; not persisted.";
+  }catch(err){note.textContent="Save failed. Try again.";setSave(false,"Document link not saved");}
+});
+document.addEventListener("change",e=>{
+  if(e.target.id==="profile-file-upload"){
+    const files=[...e.target.files];e.target.value="";if(files.length)saveLocalFiles(files);
+  }
+});
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.docFilter){documentFilter=b.dataset.docFilter;renderProfile();}
+  else if(b.dataset.docDownload)downloadLocalDocument(b.dataset.docDownload);
+  else if(b.dataset.docDelete)removeProfileDocument(b.dataset.docDelete,b.dataset.docStorage);
+  else if(b.dataset.docCopy){
+    const d=syncedDocuments.find(x=>x.id===b.dataset.docCopy);
+    if(!d||!httpsLink(d.url))return;
+    try{await navigator.clipboard.writeText(d.url);b.textContent="Copied";setTimeout(()=>b.textContent="Copy link",1500);}
+    catch(err){$("doc-link-note").textContent="Clipboard unavailable; open the document to copy its link.";}
+  } else if(b.id==="profile-copy-brief"){
+    const note=$("profile-brief-note");
+    try{await navigator.clipboard.writeText(candidateBrief());note.textContent="Candidate brief copied.";}
+    catch(e){note.textContent="Clipboard unavailable in this browser.";}
+  }
+});
 /* ---------- funnels ---------- */
 const AP_RANK = {"Applied":1,"Online test":2,"HireVue":3,"Interview":4,"Offer":5};
 const apRank = r => r.status === "Rejected" || r.status === "Withdrawn" ? (AP_RANK[r.rejectedAt] || 1) : (AP_RANK[r.status] || 0);
@@ -899,6 +1439,7 @@ function render(){
   renderStats();
   if (view === "overview") renderOverview();
   else if (view === "companies") renderCompanies();
+  else if (view === "profile") renderProfile();
   else renderTable(view);
   if (view === "applications"){ appFunnel("fn-ap"); renderTriage("ap"); renderSuggestionReview(); }
   if (view === "linkedin") outFunnel("fn-li", ofCh("LinkedIn"));
@@ -1239,6 +1780,7 @@ function loadSample(){
 }
 /* ---------- boot ---------- */
 show((location.hash || "").slice(1));
+loadLocalDocuments();
 (async () => { mcp = await window.claude?.use?.("mcp"); })();
 (async () => {
   db = await window.claude?.use?.("db");
@@ -1263,6 +1805,10 @@ show((location.hash || "").slice(1));
   db.collection("prospects").onSnapshot(snap => { prospects = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); }, () => {});
   db.collection("companies").onSnapshot(snap => { companyProfiles = snap.docs.map(d => ({id:d.id, ...d.data()})); render(); },
     () => setSave(false, "Could not load company profiles"));
+  db.doc("profile/main").onSnapshot(snap => {candidateProfile=snap.exists?{...candidateProfile,...snap.data()}:candidateProfile;render();},
+    () => setSave(false, "Could not load profile details"));
+  db.collection("profile_documents").onSnapshot(snap => {syncedDocuments=snap.docs.map(d=>({id:d.id,...d.data()}));render();},
+    () => setSave(false, "Could not load document links"));
   db.collection("application_suggestions").onSnapshot(snap => { statusSuggestions = snap.docs.map(d => ({id:d.id, ...d.data()})); render(); },
     () => setSave(false, "Could not load AI updates"));
   Object.entries(SRC).forEach(([k, s]) => {
