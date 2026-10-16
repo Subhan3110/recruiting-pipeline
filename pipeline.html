@@ -267,6 +267,32 @@ a.mail:hover{text-decoration:underline}
 .sconfirm .btn{padding:4px 10px;font-size:12px}
 .sline{font-size:12px;font-weight:500}
 .sline.ok{color:var(--s-good)} .sline.err{color:var(--s-bad)}
+
+.ai-section{display:grid;gap:12px}
+.ai-import{border-top:1px solid var(--line);padding-top:9px}
+.ai-import summary{cursor:pointer;font-weight:600}
+.ai-import textarea{display:block;width:100%;margin:9px 0;font:12px/1.5 var(--mono);box-sizing:border-box}
+.ai-card{display:grid;gap:8px;padding:12px;border:1px solid var(--line);background:var(--surface);border-radius:5px}
+.ai-card .ai-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ai-card .ai-evidence{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.ai-card .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ai-card select{max-width:100%;flex:1;min-width:160px}
+.company-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.company-card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;display:grid;gap:8px;align-content:start;text-align:left;color:var(--ink);font:inherit;cursor:pointer}
+.company-card:hover{border-color:var(--accent)}
+.company-card strong{font-size:16px}
+.company-card small{font-size:12px;color:var(--muted)}
+.company-profile{display:grid;gap:14px}
+.company-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.company-columns .panel-box{min-width:0}
+.company-line{border-bottom:1px solid var(--line);padding:8px 0;font-size:13px;overflow-wrap:anywhere}
+.company-line:last-child{border:0}
+.company-line strong{display:block}
+.company-line small{color:var(--muted)}
+.company-form{display:grid;gap:10px}
+.company-form textarea{resize:vertical;width:100%;box-sizing:border-box}
+.company-form input{width:100%;box-sizing:border-box}
+@media(max-width:760px){.company-columns{grid-template-columns:1fr}}
 </style>
 
 <div class="wrap">
@@ -283,6 +309,7 @@ a.mail:hover{text-decoration:underline}
     <button class="ttab" role="tab" data-view="linkedin">LinkedIn<span id="c-li"></span></button>
     <button class="ttab" role="tab" data-view="email">Email<span id="c-em"></span></button>
     <button class="ttab" role="tab" data-view="applications">Applications<span id="c-ap"></span></button>
+    <button class="ttab" role="tab" data-view="companies">Companies</button>
   </nav>
 
   <!-- OVERVIEW -->
@@ -349,8 +376,24 @@ a.mail:hover{text-decoration:underline}
       <div class="kpi"><span class="n" id="ap-o">0</span><span class="l">Offers</span></div>
     </div>
     <div><h2 class="sec">Funnel <span>Reached each stage or later</span></h2><div class="fun" id="fn-ap"></div></div>
+    <div class="panel-box ai-section">
+      <div class="tri-head"><div><h2>AI application updates <span id="ai-count" class="tag">0 pending</span></h2>
+        <p class="tri-meta">Review status and deadline changes from Claude, Gemini or any other AI before they affect your applications.</p></div></div>
+      <div id="ai-suggestions" class="stack"></div>
+      <details class="ai-import"><summary>Import updates from another AI (JSON)</summary>
+        <p class="tri-meta">Paste an array of updates, or an object with an "updates" array. Each update needs company and proposedStatus. Include role, provider, sourceId, confidence, deadline and evidence when available.</p>
+        <textarea id="ai-import-input" rows="6" spellcheck="false" placeholder='[{"company":"Example Bank","role":"2027 Summer Analyst","proposedStatus":"HireVue","provider":"Gemini","sourceId":"message-123","confidence":"high","evidence":"Invitation email"}]'></textarea>
+        <div class="acts"><button class="btn primary" id="ai-import-button" type="button">Import suggestions</button><span id="ai-import-note" class="tri-meta"></span></div>
+      </details>
+      <p class="tri-meta" id="ai-action-note" aria-live="polite"></p>
+    </div>
     <div style="display:grid;gap:14px" data-tri="ap"></div>
     <div style="display:grid;gap:12px" data-table="applications"></div>
+  </section>
+  <!-- COMPANIES -->
+  <section class="view" id="v-companies" hidden>
+    <div class="tri-head"><div><h2>Company profiles</h2><p class="tri-meta">Applications, LinkedIn, email contacts and prospects in one place. Add aliases to join different company names.</p></div></div>
+    <div id="companies-root" class="stack"></div>
   </section>
 </div>
 
@@ -371,7 +414,7 @@ const STAT = {
   outreach: [["Drafted","--s-prep"],["Sent","--s-sent"],["Replied","--s-test"],["Call booked","--s-int"],["Call done","--s-good"],["No reply","--s-cold"],["Declined","--s-bad"]]
 };
 const FIELDS = {
-  applications: [["company","Firm"],["role","Role"],["division","Division / desk"],["location","Location"],["status","Status","status"],["applied","Applied on","date"],["deadline","Deadline","date"],["source","Logged from","sel",["Manual","Gmail"]],["link","Posting link","url","full"],["notes","Notes","area","full"]],
+  applications: [["company","Firm"],["role","Role"],["division","Division / desk"],["location","Location"],["status","Status","status"],["applied","Applied on","date"],["deadline","Deadline","date"],["source","Logged from","sel",["Manual","Gmail","AI"]],["link","Posting link","url","full"],["notes","Notes","area","full"]],
   linkedin: [["name","Name"],["firm","Firm"],["title","Title / desk"],["via","Referred by"],["status","Status","status"],["sent","Sent on","date"],["followUp","Follow up on","date"],["profile","Profile link","url"],["notes","Notes","area","full"]],
   email: [["name","Name"],["firm","Firm"],["title","Title / desk"],["address","Email address"],["status","Status","status"],["sent","Sent on","date"],["followUp","Follow up on","date"],["via","Referred by"],["notes","Notes","area","full"]]
 };
@@ -380,7 +423,7 @@ const live = new Set(["Applied","Online test","HireVue","Interview"]);
 const replied = new Set(["Replied","Call booked","Call done","Declined"]);
 const contacted = new Set(["Sent","Replied","Call booked","Call done","No reply","Declined"]);
 const met = new Set(["Call booked","Call done"]);
-const VIEWS = ["overview","linkedin","email","applications"];
+const VIEWS = ["overview","linkedin","email","applications","companies"];
 
 let state = {applications:[], outreach:[]};
 let view = "overview", db = null, mcp = null, editing = null;
@@ -408,7 +451,7 @@ function typeOf(r){
 }
 const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\(.*?\)/g, "")
   .replace(/\b(oslo|london|stockholm|plc|group|asa|as|ltd|bank|securities|capital markets)\b/g, "").replace(/[^a-z]/g, "");
-const firmMatch = (a, b) => { a = norm(a); b = norm(b); return a.length >= 2 && b.length >= 2 && (a.startsWith(b) || b.startsWith(a)); };
+const firmMatch = (a, b) => !!(a && b && companyKey(a) && companyKey(a) === companyKey(b));
 const contactsFor = app => state.outreach.filter(o => firmMatch(o.firm, app.company));
 const appsFor = o => state.applications.filter(a => firmMatch(o.firm, a.company));
 const nameKey = n => norm(n);
@@ -418,6 +461,225 @@ const ofCh = ch => state.outreach.filter(r => (r.channel || "LinkedIn") === ch);
 function setSave(ok, text){ const el = $("save"); el.className = "save" + (ok ? "" : " off"); el.innerHTML = "<b>●</b> " + esc(text); }
 
 
+/* ---------- company profiles: canonical firms and shared records ---------- */
+let companyProfiles = [], activeCompany = null, companyQuery = "";
+function companyKey(name){
+  const key = norm(name);
+  if (!key) return "";
+  const profile = companyProfiles.find(p => norm(p.name) === key ||
+    (Array.isArray(p.aliases) ? p.aliases : String(p.aliases || "").split(",")).some(a => norm(a) === key));
+  return profile ? profile.id : key;
+}
+function companyGroups(){
+  const groups = new Map();
+  const add = (name, type, value) => {
+    const id = companyKey(name); if (!id) return;
+    if (!groups.has(id)) groups.set(id, {id, names:new Set(), applications:[], outreach:[], prospects:[], profile:null});
+    const g = groups.get(id); if (name) g.names.add(name);
+    if (type) g[type].push(value);
+  };
+  companyProfiles.forEach(p => { add(p.name || p.id); const g = groups.get(p.id); if(g) g.profile = p; });
+  state.applications.forEach(a => add(a.company, "applications", a));
+  state.outreach.forEach(o => add(o.firm, "outreach", o));
+  prospects.forEach(p => add(p.firm, "prospects", p));
+  return [...groups.values()].map(g => ({
+    ...g, name:g.profile?.name || [...g.names].sort((a,b)=>a.length-b.length)[0] || g.id,
+    aliases:g.profile?.aliases || [],
+    notes:g.profile?.notes || ""
+  })).sort((a,b)=>a.name.localeCompare(b.name));
+}
+function renderCompanies(){
+  const root = $("companies-root"); if (!root) return;
+  const groups = companyGroups();
+  const selected = activeCompany ? groups.find(g => g.id === activeCompany) : null;
+  if (!selected){
+    const filtered = groups.filter(g => !companyQuery || [g.name,...g.names].join(" ").toLowerCase().includes(companyQuery.toLowerCase()));
+    root.innerHTML = `<div class="toolbar"><input id="q-companies" type="search" placeholder="Search companies" value="${esc(companyQuery)}" aria-label="Search companies"><span class="tri-meta">${filtered.length} companies</span></div>
+      <div class="company-grid">${filtered.length ? filtered.map(g => `<button class="company-card" data-company="${esc(g.id)}">
+        <strong>${esc(g.name)}</strong><small>${g.applications.length} application(s) · ${g.outreach.length} contact(s) · ${g.prospects.length} prospect(s)</small>
+        <small>${esc(g.notes.slice(0,100) || "Open company profile →")}</small></button>`).join("") : '<p class="empty-note">No firms found.</p>'}</div>`;
+    return;
+  }
+  const apps = selected.applications.map(a => `<div class="company-line"><strong>${esc(a.role || "Application")}</strong>
+    <small>${esc(a.status || "Preparing")} · ${esc(a.location || "")}${a.deadline ? " · deadline " + esc(fmt(a.deadline)) : ""}</small>
+    <div><button class="rowbtn" data-company-app="${esc(a.id)}">Edit application</button></div></div>`).join("") || '<p class="empty-note">No applications.</p>';
+  const people = selected.outreach.map(o => `<div class="company-line"><strong>${esc(o.name)}</strong>
+    <small>${esc(o.title || "")} · ${esc(o.channel || "LinkedIn")} · ${esc(o.status || "")}</small>
+    <div><button class="rowbtn" data-company-contact="${esc(o.id)}" data-contact-channel="${esc(o.channel || "LinkedIn")}">Edit contact</button></div></div>`).join("") || '<p class="empty-note">No contacts yet.</p>';
+  const prospectsList = selected.prospects.filter(p => (p.status || "New") === "New").map(p =>
+    `<div class="company-line"><strong>${esc(p.name)}</strong><small>${esc(p.title || "")} · Prospect</small></div>`).join("");
+  root.innerHTML = `<div class="company-profile">
+    <div class="toolbar"><button class="btn" data-company-back>← All companies</button><h2>${esc(selected.name)}</h2></div>
+    <div class="kpis k4"><div class="kpi"><span class="n">${selected.applications.length}</span><span class="l">Applications</span></div>
+      <div class="kpi"><span class="n">${selected.outreach.length}</span><span class="l">Contacts</span></div>
+      <div class="kpi"><span class="n">${selected.outreach.filter(x=>replied.has(x.status)).length}</span><span class="l">Replies</span></div>
+      <div class="kpi"><span class="n">${selected.prospects.length}</span><span class="l">Prospects</span></div></div>
+    <div class="company-columns">
+      <div class="panel-box"><h2 class="sec">Applications</h2>${apps}</div>
+      <div class="panel-box"><h2 class="sec">Networking</h2>${people}${prospectsList ? `<h2 class="sec">Potential contacts</h2>${prospectsList}` : ""}</div>
+    </div>
+    <form id="company-form" class="company-form panel-box" data-company-id="${esc(selected.id)}">
+      <h2 class="sec">Company notes and aliases</h2>
+      <label>Company name<input name="name" required value="${esc(selected.name)}" maxlength="150"></label>
+      <label>Other names (comma separated)<input name="aliases" value="${esc(Array.isArray(selected.aliases)? selected.aliases.join(", ") : selected.aliases)}" placeholder="e.g. JP Morgan, JPMorgan Chase"></label>
+      <label>Research / conversations / next steps<textarea name="notes" rows="5" placeholder="What do you know about this firm?">${esc(selected.notes)}</textarea></label>
+      <div class="acts"><button type="submit" class="btn primary">Save company profile</button><span class="tri-meta" id="company-save-note"></span></div>
+    </form></div>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  if (b.hasAttribute("data-company-back")){ activeCompany=null; render(); }
+  else if(b.dataset.companyApp){ show("applications"); openForm("applications",b.dataset.companyApp); }
+  else if(b.dataset.companyContact){ const channel=b.dataset.contactChannel==="Email"?"email":"linkedin"; show(channel);openForm(channel,b.dataset.companyContact); }
+});
+document.addEventListener("input", e => {
+  if(e.target.id==="q-companies"){ companyQuery=e.target.value; renderCompanies(); const input=$("q-companies"); input?.focus(); input?.setSelectionRange(companyQuery.length,companyQuery.length); }
+});
+document.addEventListener("submit",async e => {
+  if(e.target.id!=="company-form") return;
+  e.preventDefault();
+  const form=e.target, id=form.dataset.companyId, fd=new FormData(form);
+  const name=String(fd.get("name")||"").trim();
+  if(!name) return;
+  const aliases=String(fd.get("aliases")||"").split(",").map(s=>s.trim()).filter(Boolean);
+  const duplicate = aliases.some(a => companyProfiles.some(p => p.id!==id && (norm(p.name)===norm(a) || (p.aliases||[]).some(x => norm(x)===norm(a)))));
+  if(duplicate){ $("company-save-note").textContent="An alias already belongs to another company.";return; }
+  const data={name, aliases, notes:String(fd.get("notes")||""), updatedAt:new Date().toISOString()};
+  if(db){ try{await db.collection("companies").doc(id).set(data);$("company-save-note").textContent="Saved.";}
+    catch(err){setSave(false,"Could not save company");$("company-save-note").textContent="Save failed.";return;} }
+  const prior=companyProfiles.find(x=>x.id===id);
+  if(prior) Object.assign(prior,data); else companyProfiles.push({id,...data});
+  render();
+});
+/* ---------- AI-neutral status proposals and review queue ---------- */
+let statusSuggestions = [];
+const updateStatuses = new Set(STAT.applications.map(([s])=>s));
+function isDateISO(s){
+  if(typeof s!=="string" || !/^\d{4}-\d{2}-\d{2}$/.test(s))return false;
+  const d=new Date(s+"T00:00:00Z");
+  return !isNaN(d.valueOf()) && d.toISOString().slice(0,10)===s;
+}
+function safeEvidenceLink(url){
+  return typeof url==="string" && /^https:\/\/[a-z0-9.-]+(?:[:/][^\s]*)?$/i.test(url) ? url : "";
+}
+function hashSuggestion(input){
+  let hash=2166136261;
+  for(let i=0;i<input.length;i++){hash=Math.imul(hash ^ input.charCodeAt(i),16777619);}
+  return "ai-"+(hash>>>0).toString(36);
+}
+function matchingApplications(s){
+  const firm=companyKey(s.company || s.firm);
+  const same=state.applications.filter(a=>companyKey(a.company)===firm);
+  if(!s.role || !same.length)return same;
+  const role=String(s.role).toLowerCase().replace(/[^a-z0-9]/g,"");
+  const exact=same.filter(a=>String(a.role||"").toLowerCase().replace(/[^a-z0-9]/g,"")===role);
+  return exact.length ? [...exact,...same.filter(a=>!exact.includes(a))] : same;
+}
+function renderSuggestionReview(){
+  const root=$("ai-suggestions");if(!root)return;
+  const pending=statusSuggestions.filter(s=>!s.status || s.status==="pending").sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+  $("ai-count").textContent=pending.length+" pending";
+  if(!pending.length){root.innerHTML='<p class="empty-note">No AI updates waiting for review. Run Check applications, or import JSON from another AI.</p>';return;}
+  root.innerHTML=pending.map(s=>{
+    const candidates=matchingApplications(s);
+    const status=String(s.proposedStatus||s.newStatus||"");
+    const firm=String(s.company||s.firm||"");
+    const link=safeEvidenceLink(s.sourceUrl||s.emailUrl);
+    const options = `<option value="">Choose an application</option>`+
+      candidates.map((a,i)=>`<option value="${esc(a.id)}"${i===0 && candidates.length===1?" selected":""}>${esc(a.company)} — ${esc(a.role||"Unknown role")} (${esc(a.status)})</option>`).join("")+
+      `<option value="__new__">+ Create a new application</option>`;
+    return `<article class="ai-card" data-suggestion-card="${esc(s.id)}">
+      <div class="ai-top"><strong>${esc(firm)} · ${esc(s.role||"Role not specified")}</strong>
+        <span class="tag">${esc(s.provider||"AI")} · ${esc(s.confidence||"unrated")}</span></div>
+      <div><span class="pill" style="--c:var(${color("applications", status)})"><span style="padding:4px 10px 4px 22px;font-weight:600">${esc(status)}</span></span>
+        ${isDateISO(s.deadline) ? `<span class="tag">Deadline ${esc(s.deadline)}</span>` : ""}</div>
+      <div class="ai-evidence">${esc(s.evidence||"No supporting excerpt provided.")}${link ? ` · <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">Source</a>` : ""}</div>
+      <div class="ai-evidence">Source ID: ${esc(s.sourceId||"not supplied")} · ${esc(s.createdAt||"")}</div>
+      <div class="acts"><select aria-label="Application to update" data-match-select="${esc(s.id)}">${options}</select>
+      <button class="btn primary" data-ai-apply="${esc(s.id)}">Apply update</button>
+      <button class="btn" data-ai-dismiss="${esc(s.id)}">Dismiss</button></div></article>`;
+  }).join("");
+}
+function normaliseSuggestion(input){
+  const company=String(input.company||input.firm||"").trim();
+  const proposedStatus=String(input.proposedStatus||input.newStatus||"").trim();
+  if(!company || !updateStatuses.has(proposedStatus))throw Error("Each update needs company and a valid proposedStatus.");
+  const provider=String(input.provider||"External AI").trim().slice(0,80);
+  const role=String(input.role||"").trim().slice(0,250);
+  const sourceId=String(input.sourceId||input.messageId||"").trim().slice(0,250);
+  const deadline=input.deadline && isDateISO(input.deadline) ? input.deadline : "";
+  const id=hashSuggestion(JSON.stringify([provider,sourceId,company,role,proposedStatus,deadline]));
+  return {id,company,role,proposedStatus,provider,sourceId,deadline,
+    confidence:String(input.confidence||"unrated").slice(0,50),
+    evidence:String(input.evidence||input.reason||"").slice(0,1500),
+    sourceUrl:safeEvidenceLink(input.sourceUrl||input.emailUrl),
+    status:"pending",createdAt:new Date().toISOString()};
+}
+async function importSuggestions(){
+  const msg=$("ai-import-note");
+  try{
+    const parsed=JSON.parse($("ai-import-input").value);
+    const items=Array.isArray(parsed)?parsed:parsed?.updates;
+    if(!Array.isArray(items)||items.length<1||items.length>50)throw Error("Provide 1–50 updates in a JSON array.");
+    const additions=items.map(normaliseSuggestion);
+    const fresh=additions.filter((x,i)=>!statusSuggestions.some(s=>s.id===x.id) && additions.findIndex(y=>y.id===x.id)===i);
+    for(const x of fresh){
+      if(db) await db.collection("application_suggestions").doc(x.id).set((({id,...data})=>data)(x));
+      else statusSuggestions.push(x);
+    }
+    msg.textContent=`Imported ${fresh.length}; skipped ${additions.length-fresh.length} duplicate(s).`;
+    $("ai-import-input").value="";
+    render();
+  }catch(err){msg.textContent="Import failed: "+(err?.message||"invalid JSON");}
+}
+async function decideSuggestion(id, mode, appId){
+  const s=statusSuggestions.find(x=>x.id===id);
+  if(!s || (s.status && s.status!=="pending"))return;
+  const msg=$("ai-action-note");
+  if(mode==="apply" && !appId){msg.textContent="Choose the exact application, or create a new one.";return;}
+  const newStatus=String(s.proposedStatus||s.newStatus||"");
+  if(mode==="apply" && !updateStatuses.has(newStatus)){msg.textContent="Invalid status proposal.";return;}
+  const current=appId!=="__new__" ? state.applications.find(x=>x.id===appId) : null;
+  if(mode==="apply" && appId!=="__new__" && (!current || !firmMatch(current.company,s.company||s.firm))){msg.textContent="Selected application does not match the company.";return;}
+  if(mode==="apply" && current && ["Applied","Online test","HireVue","Interview","Offer"].includes(current.status)
+    && ["Preparing","Applied","Online test","HireVue","Interview","Offer"].includes(newStatus)
+    && (AP_RANK[newStatus]||0)<(AP_RANK[current.status]||0)){msg.textContent="Older-stage proposal blocked. Dismiss it or update manually.";return;}
+  const now=new Date().toISOString();
+  const reviewed={...s,status:mode==="apply"?"applied":"dismissed",reviewedAt:now};
+  if(mode==="apply"){
+    const idNew=appId==="__new__" ? "ai-"+hashSuggestion(id).slice(3) : current.id;
+    reviewed.targetApplicationId=idNew;
+    const data=current?{...current}:{company:s.company||s.firm,role:s.role||"",applied:today0()};
+    delete data.id;
+    if(current?.status && newStatus==="Rejected")data.rejectedAt=current.status;
+    data.status=newStatus;
+    if(!data.company)data.company=s.company||s.firm;
+    if(!data.role&&s.role)data.role=s.role;
+    if(isDateISO(s.deadline))data.deadline=s.deadline;
+    data.source=data.source||"AI";
+    data.lastAiProvider=String(s.provider||"AI");
+    data.lastAiSourceId=String(s.sourceId||"");
+    data.lastAiUpdateAt=now;
+    data.updated=now;
+    try{
+      if(db)await db.collection("applications").doc(idNew).set(data);
+      else if(current)Object.assign(current,data);
+      else state.applications.push({id:idNew,...data});
+    }catch(err){setSave(false,"Could not save application update");msg.textContent="Failed to save application; suggestion remains pending.";return;}
+  }
+  try{
+    if(db){const {id:ignored,...data}=reviewed;await db.collection("application_suggestions").doc(id).set(data);}
+    else Object.assign(s,reviewed);
+    msg.textContent=mode==="apply"?"Application updated.":"Suggestion dismissed.";
+    render();
+  }catch(err){setSave(false,"Suggestion review not saved");msg.textContent="Application may be updated, but review marker failed. Refresh before retrying.";}
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.id==="ai-import-button")importSuggestions();
+  else if(b.dataset.aiApply){const card=b.closest("[data-suggestion-card]");decideSuggestion(b.dataset.aiApply,"apply",card?.querySelector("select")?.value);}
+  else if(b.dataset.aiDismiss)decideSuggestion(b.dataset.aiDismiss,"dismiss","");
+});
 /* ---------- funnels ---------- */
 const AP_RANK = {"Applied":1,"Online test":2,"HireVue":3,"Interview":4,"Offer":5};
 const apRank = r => r.status === "Rejected" || r.status === "Withdrawn" ? (AP_RANK[r.rejectedAt] || 1) : (AP_RANK[r.status] || 0);
@@ -587,7 +849,7 @@ function renderApps(){
     .sort((a,b) => String(b.applied || "").localeCompare(String(a.applied || "")));
   const pill = r => `<span class="pill" style="--c:var(${color("applications", r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="applications">${STAT.applications.map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
   const dash = '<span class="blank">–</span>';
-  const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><strong>${esc(r.company)}</strong><small>${esc(r.role || "")}</small>${mailBtn(r)}</td>
+  const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><button class="rowbtn" data-company="${esc(companyKey(r.company))}">${esc(r.company)}</button><small>${esc(r.role || "")}</small>${mailBtn(r)}</td>
     <td><span class="tag">${typeOf(r)}</span>${c.length ? `<span class="tag warm" title="${esc(c.map(o => o.name + " (" + o.status + ")").join(", "))}">${c.length} contact${c.length > 1 ? "s" : ""}</span>` : ""}</td>
     <td>${esc(r.location || "")}</td><td>${pill(r)}</td><td class="num">${fmt(r.applied) || dash}</td>
     <td class="num ${r.deadline && -days(r.deadline) <= 3 && -days(r.deadline) >= 0 ? "overdue" : ""}">${fmt(r.deadline) || dash}</td>
@@ -624,7 +886,7 @@ function renderTable(v){
   } else {
     head.innerHTML = `<tr><th>Person</th><th>${v === "email" ? "Address" : "Referred by"}</th><th>Status</th><th>Sent</th><th>Waiting</th><th>Notes</th><th></th></tr>`;
     body.innerHTML = rows.length ? rows.map(r => { const d = r.status === "Sent" ? days(r.sent) : null; return `<tr>
-      <td class="who"><strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))}</small>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
+      <td class="who"><strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))}</small><button class="rowbtn" data-company="${esc(companyKey(r.firm))}">Firm ↗</button>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
       <td>${v === "email" ? (r.address ? `<span style="font-family:var(--mono);font-size:12px">${esc(r.address)}</span>` : dash) : (r.via ? esc(r.via) : dash)}</td>
       <td>${pill(r)}</td><td class="num">${fmt(r.sent) || dash}</td>
       <td class="num ${d >= 7 ? "overdue" : ""}">${d != null ? d + "d" : dash}</td>
@@ -636,8 +898,9 @@ function render(){
   drafts.clear();
   renderStats();
   if (view === "overview") renderOverview();
+  else if (view === "companies") renderCompanies();
   else renderTable(view);
-  if (view === "applications"){ appFunnel("fn-ap"); renderTriage("ap"); }
+  if (view === "applications"){ appFunnel("fn-ap"); renderTriage("ap"); renderSuggestionReview(); }
   if (view === "linkedin") outFunnel("fn-li", ofCh("LinkedIn"));
   if (view === "email") outFunnel("fn-em", ofCh("Email"));
   if (view === "linkedin"){ renderTriage("li"); renderProspects(); }
@@ -682,6 +945,7 @@ document.addEventListener("click", e => {
   const t = e.target.closest("button"); if (!t) return;
   if (t.dataset.view) show(t.dataset.view);
   else if (t.dataset.go) show(t.dataset.go);
+   else if (t.dataset.company) { activeCompany = t.dataset.company; show("companies"); }
   else if (t.dataset.f !== undefined && t.dataset.v){ ui[t.dataset.v].filter = t.dataset.f || null; render(); }
   else if (t.dataset.edit) openForm(t.dataset.v, t.dataset.edit);
   else if (t.dataset.add) openForm(t.dataset.add, null);
@@ -968,6 +1232,9 @@ function loadSample(){
   tri.em.data = {status:"done", runAt:new Date().toISOString(), items:[
     triItem("Jamie Demo","Demo Capital","thank","Sample: shared advice on the off-cycle process.","Hi Jamie, sample thank-you email. Best, Subhan Butt, MSc Finance, Imperial College London")]};
   triage = tri.li.data;
+  statusSuggestions = [
+    {id:"demo-ai-1",company:"Sample Bank",role:"2027 IB Summer Analyst",proposedStatus:"Interview",provider:"Claude (sample)",confidence:"high",evidence:"Sample interview invitation – not a real email.",sourceId:"demo-message",status:"pending",createdAt:new Date().toISOString()}
+  ];
   render();
 }
 /* ---------- boot ---------- */
@@ -994,6 +1261,10 @@ show((location.hash || "").slice(1));
   db.doc("triage/done").onSnapshot(x => { doneMap = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
   db.doc("triage/dismissed").onSnapshot(x => { dismissed = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
   db.collection("prospects").onSnapshot(snap => { prospects = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); }, () => {});
+  db.collection("companies").onSnapshot(snap => { companyProfiles = snap.docs.map(d => ({id:d.id, ...d.data()})); render(); },
+    () => setSave(false, "Could not load company profiles"));
+  db.collection("application_suggestions").onSnapshot(snap => { statusSuggestions = snap.docs.map(d => ({id:d.id, ...d.data()})); render(); },
+    () => setSave(false, "Could not load AI updates"));
   Object.entries(SRC).forEach(([k, s]) => {
     db.doc(s.doc).onSnapshot(x => { tri[k].data = x.exists ? x.data() : null; if (k === "li") triage = tri.li.data; render(); }, () => {});
     db.doc(s.run).onSnapshot(x => { if (x.exists){ const r = x.data().requestedAt; if (!tri[k].req || r > tri[k].req) tri[k].req = r; } render(); }, () => {});
