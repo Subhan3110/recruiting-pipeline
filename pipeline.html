@@ -143,6 +143,7 @@ td.notes{color:var(--muted);font-size:13px;max-width:300px}
 .pc .acts .btn{padding:5px 10px;font-size:12px}
 .tri-none{font-size:13px;color:var(--muted)}
 .tri-none summary{cursor:pointer}
+.sheet[hidden]{display:none}
 .sheet{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 35%,transparent);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;width:min(560px,100%);max-height:calc(100% - 32px);overflow:auto;padding:20px;display:grid;gap:14px}
 .panel h3{font-family:var(--display);font-stretch:85%;font-size:20px;margin:0}
@@ -201,6 +202,11 @@ td.notes{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellips
 .it:last-child{border-bottom:0}
 .it summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:minmax(0,170px) minmax(0,150px) minmax(0,1fr) auto;align-items:center;gap:10px;padding:6px 12px;font-size:13px}
 .it summary::-webkit-details-marker{display:none}
+.it summary{position:relative;padding-right:36px}
+.trash{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);cursor:pointer;padding:3px 5px;border-radius:4px;line-height:0;opacity:.55}
+.trash:hover{opacity:1;color:var(--s-bad);background:var(--soft)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 10px 8px 14px;border-radius:6px;font-size:13px;display:flex;gap:10px;align-items:center;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+.toast button{background:none;border:0;color:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
 .it summary:hover{background:var(--soft)}
 .it[open] summary{background:var(--soft)}
 .it summary strong{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -405,7 +411,7 @@ const contactsFor = app => state.outreach.filter(o => firmMatch(o.firm, app.comp
 const appsFor = o => state.applications.filter(a => firmMatch(o.firm, a.company));
 const nameKey = n => norm(n);
 const today0 = () => new Date().toISOString().slice(0,10);
-let doneMap = {};
+let doneMap = {}, dismissed = {};
 const ofCh = ch => state.outreach.filter(r => (r.channel || "LinkedIn") === ch);
 function setSave(ok, text){ const el = $("save"); el.className = "save" + (ok ? "" : " off"); el.innerHTML = "<b>●</b> " + esc(text); }
 
@@ -498,33 +504,33 @@ function triBody(i){
     draftBox("Draft", i.draft, i.subject, {key, channel: i.ch, name: i.name, firm: i.firm, threadUrl: i.threadUrl, emailUrl: i.emailUrl, profileUrl: (state.outreach.find(r => nameKey(r.name) === nameKey(i.name)) || {}).profile}));
 }
 function renderToday(triItems){
-  const open = triItems.filter(i => !doneMap[triKey(i)]);
-  const testsLive = state.applications.filter(r => (r.status === "Online test" || r.status === "HireVue") && !/\b(completed|submitted|done)\b/i.test(r.notes || ""));
+  const open = triItems.filter(i => !doneMap[triKey(i)] && !dismissed[triKey(i)]);
+  const testsLive = state.applications.filter(r => !dismissed["dl:" + r.id] && (r.status === "Online test" || r.status === "HireVue") && !/\b(completed|submitted|done)\b/i.test(r.notes || ""));
   const dl = testsLive.map(r => {
     const d = r.deadline ? -days(r.deadline) : null, passed = /deadline passed/i.test(r.notes || "") || (d != null && d < 0);
     return {r, d, passed, label: passed ? "Deadline passed" : d != null ? (d === 0 ? "Due today" : "Due in " + d + "d") : "Check portal"};
   }).sort((a,b) => (b.passed - a.passed) || ((a.d ?? 999) - (b.d ?? 999)));
   const fuNames = new Set(open.filter(i => i.bucket === "followup").map(i => nameKey(i.name)));
-  const fuRows = state.outreach.filter(overdue).filter(r => !fuNames.has(nameKey(r.name)));
+  const fuRows = state.outreach.filter(overdue).filter(r => !fuNames.has(nameKey(r.name)) && !dismissed["fu:" + r.id]);
   const warm = state.applications.filter(a => ["Applied","Online test","HireVue","Interview"].includes(a.status))
-    .map(a => ({a, c: contactsFor(a).filter(o => ["Replied","Call booked","Call done"].includes(o.status))})).filter(x => x.c.length);
+    .filter(a => !dismissed["w:" + a.id]).map(a => ({a, c: contactsFor(a).filter(o => ["Replied","Call booked","Call done"].includes(o.status))})).filter(x => x.c.length);
   const newP = prospects.filter(p => (p.status || "New") === "New").slice(0, 3);
-  const triRow = i => item("t:" + triKey(i), `<strong>${esc(i.name)}<span class="tag">${esc(i.ch)}</span></strong><span class="m">${esc(i.firm || "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${fmt(i.lastDate)}</span>`, triBody(i));
+  const triRow = i => item("t:" + triKey(i), `<strong>${esc(i.name)}<span class="tag">${esc(i.ch)}</span></strong><span class="m">${esc(i.firm || "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${fmt(i.lastDate)}</span>`, triBody(i), "d:" + triKey(i));
   const groups = [
     ["dl","Deadlines","Tests and HireVues not yet completed","--s-bad", dl.map(x => item("dl:" + x.r.id,
       `<strong>${esc(x.r.company)}</strong><span class="m">${esc(x.r.status)}</span><span class="g">${esc(x.r.role || "")}</span><span class="d ${x.passed || (x.d != null && x.d <= 3) ? "hot" : ""}">${x.label}</span>`,
-      `<p class="gist">${esc(x.r.notes || "No notes.")}</p><p class="sug">${x.r.deadline ? "Deadline " + fmt(x.r.deadline) + ". " : "No deadline in the emails. Check the portal. "}When done, write "done" in the notes or move the status.</p>${mailBtn(x.r, true)}`))],
+      `<p class="gist">${esc(x.r.notes || "No notes.")}</p><p class="sug">${x.r.deadline ? "Deadline " + fmt(x.r.deadline) + ". " : "No deadline in the emails. Check the portal. "}When done, write "done" in the notes or move the status.</p>${mailBtn(x.r, true)}`, "d:dl:" + x.r.id))],
     ["reply","Needs your reply","They asked something or proposed a next step","--s-int", open.filter(i => i.bucket === "reply").map(triRow)],
     ["thank","Send a thank-you","They helped or you met","--s-good", open.filter(i => i.bucket === "thank").map(triRow)],
     ["followup","Follow up","7+ days without an answer","--s-sent", [...open.filter(i => i.bucket === "followup").map(triRow), ...fuRows.map(r => item("fu:" + r.id,
       `<strong>${esc(r.name)}<span class="tag">${esc(r.channel || "LinkedIn")}</span></strong><span class="m">${esc(r.firm || "")}</span><span class="g">No draft yet. Run a check to get one.</span><span class="d">${days(lastTouch(r))}d</span>`,
-      `<p class="gist">${esc(r.notes || "")}</p><div class="acts"><button class="btn" data-fudone="${r.id}">Mark followed up</button></div>`))]],
+      `<p class="gist">${esc(r.notes || "")}</p><div class="acts"><button class="btn" data-fudone="${r.id}">Mark followed up</button></div>`, "d:fu:" + r.id))]],
     ["warm","Warm leads","Live applications where you know someone","--s-hv", warm.map(x => item("w:" + x.a.id,
       `<strong>${esc(x.a.company)}</strong><span class="m">${esc(x.a.status)}</span><span class="g">${esc(x.c.map(o => o.name).join(", "))}</span>`,
-      `<p class="gist">${esc(x.a.role || "")}</p><p class="sug">Let ${esc(x.c[0].name)} know where you are in the process. A short update keeps you top of mind when the desk discusses candidates.</p>`))],
+      `<p class="gist">${esc(x.a.role || "")}</p><p class="sug">Let ${esc(x.c[0].name)} know where you are in the process. A short update keeps you top of mind when the desk discusses candidates.</p>`, "d:w:" + x.a.id))],
     ["new","New people","Found on LinkedIn, note ready","--s-prep", newP.map(p => item("np:" + p.id,
       `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g">${esc(p.why || "")}</span>`,
-      split(`<p class="gist">${esc(p.why || "")}</p><div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button></div>`, draftBox("Connection note", p.liDraft))))]
+      split(`<p class="gist">${esc(p.why || "")}</p><div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button></div>`, draftBox("Connection note", p.liDraft)), "p:" + p.id))]
   ];
   if (!todayInit && groups.some(g => g[4].length)){ todayInit = true; groups.forEach(g => { if (g[4].length && ["dl","reply","thank"].includes(g[0])) openKeys.add("today:" + g[0]); }); }
   $("today").innerHTML = groups.map(([k,label,sub,c,rows]) => `<details class="cat" data-key="today:${k}" style="--c:var(${c})"${openKeys.has("today:" + k) ? " open" : ""}${rows.length ? "" : " data-empty"}>
@@ -800,21 +806,41 @@ function renderTriage(k){
   const cats = [...BUCKETS, ["none","No action","Friends, ads, closed","--s-cold"]];
   if (!triInit[k]){ triInit[k] = true; const first = cats.find(([b]) => b !== "none" && items.some(i => i.bucket === b)); if (first) openKeys.add("cat:" + k + ":" + first[0]); }
   $("tri-groups-" + k).innerHTML = `<div class="stack">${cats.map(([b,label,sub,c]) => {
-    const list = items.filter(i => i.bucket === b), key = "cat:" + k + ":" + b;
+    const ch = k === "li" ? "LinkedIn" : "Email", list = items.filter(i => i.bucket === b && !dismissed[triKey({...i, ch})]), key = "cat:" + k + ":" + b;
     return `<details class="cat" data-key="${key}" style="--c:var(${c})"${openKeys.has(key) ? " open" : ""}${list.length ? "" : " data-empty"}>
       <summary><span class="cl">${label}</span><span class="cs">${sub}</span><b>${list.length}</b></summary>
       <div class="ilist">${list.length ? list.map(i => { const ii = {...i, ch: k === "li" ? "LinkedIn" : "Email"}; return item(k + ":" + i.name, `<strong>${esc(i.name)}</strong><span class="m">${esc(i.firm || "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${doneMap[triKey(ii)] ? "Sent ✓" : fmt(i.lastDate)}</span>`,
-        triBody(ii)); }).join("") : '<p class="empty-note">Nothing here.</p>'}</div></details>`;
+        triBody(ii), "d:" + triKey(ii)); }).join("") : '<p class="empty-note">Nothing here.</p>'}</div></details>`;
   }).join("")}</div>`;
 }
 const triInit = {li:false, em:false};
 const split = (left, right) => right ? `<div class="split"><div class="l">${left}</div><div class="r">${right}</div></div>` : left;
 const triSel = {li:null, em:null};
 const openKeys = new Set();
-function item(key, head, body){
+const TRASH_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>`;
+function item(key, head, body, trash){
   const k = esc(key);
-  return `<details class="it" data-key="${k}"${openKeys.has(key) ? " open" : ""}><summary>${head}</summary><div class="body">${body}</div></details>`;
+  const t = trash ? `<button class="trash" data-trash="${esc(trash)}" title="Remove" aria-label="Remove">${TRASH_SVG}</button>` : "";
+  return `<details class="it" data-key="${k}"${openKeys.has(key) ? " open" : ""}><summary>${head}${t}</summary><div class="body">${body}</div></details>`;
 }
+/* trash: "d:<key>" hides a recommendation (saved in triage/dismissed), "p:<id>" skips a prospect */
+let undoTimer = null;
+function trashIt(spec, undo){
+  const kind = spec.slice(0, 2), id = spec.slice(2);
+  if (kind === "p:"){ const p = prospects.find(x => x.id === id); if (!p) return;
+    const prev = p.status || "New"; p.status = undo ? "New" : "Skipped"; render();
+    if (db) db.collection("prospects").doc(id).update({status: p.status}).catch(() => setSave(false, "Not saved, try again"));
+  } else {
+    dismissed = {...dismissed}; if (undo) delete dismissed[id]; else dismissed[id] = today0(); render();
+    if (db) db.doc("triage/dismissed").set({items: dismissed}).catch(() => setSave(false, "Not saved, try again"));
+  }
+  if (undo) return;
+  document.querySelector(".toast")?.remove(); clearTimeout(undoTimer);
+  const el = document.createElement("div"); el.className = "toast"; el.innerHTML = `Removed <button>Undo</button>`;
+  el.querySelector("button").onclick = () => { el.remove(); trashIt(spec, true); };
+  document.body.appendChild(el); undoTimer = setTimeout(() => el.remove(), 6000);
+}
+document.addEventListener("click", e => { const b = e.target.closest("button.trash"); if (!b) return; e.preventDefault(); e.stopPropagation(); trashIt(b.dataset.trash); }, true);
 document.addEventListener("toggle", e => { const d = e.target; if (d.matches?.("details.it, details.cat")) { d.open ? openKeys.add(d.dataset.key) : openKeys.delete(d.dataset.key); } }, true);
 
 function emailLine(p){
@@ -827,13 +853,13 @@ function renderProspects(){
   $("pros-li").innerHTML = open.length ? open.map(p => item("p:" + p.id,
       `<strong>${esc(p.name)}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
       split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${emailLine(p)}
-       <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, draftBox("Connection note", p.liDraft)))).join("")
+       <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, draftBox("Connection note", p.liDraft)), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
-  const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address).map(r => ({...r, kind:"o"}))];
+  const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
       `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
       split(`${emailLine(p)}
-       <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject, p.kind === "p" && p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)))).join("")
+       <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject, p.kind === "p" && p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and rates each guess high, medium or low.</p>`;
 }
 async function prospectAction(act, id){
@@ -931,6 +957,7 @@ show((location.hash || "").slice(1));
     render();
   }, () => {});
   db.doc("triage/done").onSnapshot(x => { doneMap = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
+  db.doc("triage/dismissed").onSnapshot(x => { dismissed = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
   db.collection("prospects").onSnapshot(snap => { prospects = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); }, () => {});
   Object.entries(SRC).forEach(([k, s]) => {
     db.doc(s.doc).onSnapshot(x => { tri[k].data = x.exists ? x.data() : null; if (k === "li") triage = tri.li.data; render(); }, () => {});
