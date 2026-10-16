@@ -251,6 +251,15 @@ td .tag{margin:0 4px 0 0}
 a.mail{font-size:11px;margin-left:8px;color:var(--accent);text-decoration:none;white-space:nowrap}
 a.mail:hover{text-decoration:underline}
 .it .acts a.btn{text-decoration:none}
+
+.dtools{display:flex;gap:6px;align-items:center}
+.copy.send{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+.sstat{font-size:12px;color:var(--muted)}
+.dedit{width:100%;font:13px/1.5 var(--body);resize:vertical;min-height:120px}
+.sconfirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;padding:8px;border-radius:4px;background:var(--soft)}
+.sconfirm .btn{padding:4px 10px;font-size:12px}
+.sline{font-size:12px;font-weight:500}
+.sline.ok{color:var(--s-good)} .sline.err{color:var(--s-bad)}
 </style>
 
 <div class="wrap">
@@ -485,7 +494,8 @@ const triMap = new Map();
 function triBody(i){
   const key = triKey(i); triMap.set(key, i);
   const acts = i.draft && !doneMap[key] ? `<div class="acts"><button class="btn primary" data-msent="${esc(key)}">Mark sent</button></div>` : doneTag(key);
-  return split(`<p class="gist">${esc(i.gist)}</p>${i.suggestion ? `<p class="sug">${esc(i.suggestion)}</p>` : ""}${acts}`, draftBox("Draft", i.draft, i.subject));
+  return split(`<p class="gist">${esc(i.gist)}</p>${i.suggestion ? `<p class="sug">${esc(i.suggestion)}</p>` : ""}${acts}`,
+    draftBox("Draft", i.draft, i.subject, {key, channel: i.ch, name: i.name, firm: i.firm, threadUrl: i.threadUrl, emailUrl: i.emailUrl, profileUrl: (state.outreach.find(r => nameKey(r.name) === nameKey(i.name)) || {}).profile}));
 }
 function renderToday(triItems){
   const open = triItems.filter(i => !doneMap[triKey(i)]);
@@ -713,12 +723,53 @@ function fmtDraft(t){
   const paras = []; for (let i = 0; i < sent.length; i += 2) paras.push(sent.slice(i, i + 2).join(" "));
   return [greet, paras.join("\n\n"), sign].filter(Boolean).join("\n\n");
 }
-function draftBox(label, text, subject){
+/* ---------- drafts: copy, edit, send ---------- */
+const SEND_TRIGGER = "trig_01YWS1NtFRdL3p9hHBHRsVcP";
+const edits = new Map(), draftEditing = new Set(), confirming = new Set(), sendCtx = new Map(), sendState = new Map();
+const safeId = k => String(k).replace(/[^A-Za-z0-9_.~:@+-]/g, "-").slice(0, 150);
+function draftBox(label, text, subject, ctx){
   if (!text) return "";
   text = fmtDraft(text);
+  const key = ctx?.key;
+  if (key){ sendCtx.set(key, {...ctx, subject: subject || ctx.subject || ""}); if (!edits.has(key)) edits.set(key, text); text = edits.get(key); }
   const id = "d" + (++draftSeq); drafts.set(id, (subject ? "Subject: " + subject + "\n\n" : "") + text);
-  return `<div class="draft"><div class="dh"><b>${esc(label)}</b><button class="copy" data-copy="${id}">Copy</button></div>${subject ? `<div class="subj">${esc(subject)}</div>` : ""}<pre>${esc(text)}</pre></div>`;
+  const st = key ? sendState.get(key) : null;
+  const sent = st?.status === "sent" || (key && doneMap[key]);
+  let tools = `<button class="copy" data-copy="${id}">Copy</button>`;
+  if (key && !sent){
+    tools = (draftEditing.has(key) ? `<button class="copy" data-edone="${esc(key)}">Done</button>` : `<button class="copy" data-edit-draft="${esc(key)}">Edit</button>`) + tools +
+      (st?.status === "sending" ? `<span class="sstat">Sending…</span>` : `<button class="copy send" data-send="${esc(key)}">Send</button>`);
+  }
+  const statusLine = sent ? `<div class="sline ok">Sent ✓ ${esc(st?.at ? new Date(st.at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "")}</div>`
+    : st?.status === "failed" ? `<div class="sline err">Not sent: ${esc(st.error || "unknown reason")}. Fix it and press Send again.</div>` : "";
+  const confirmLine = key && confirming.has(key) ? `<div class="sconfirm">Send this to <b>${esc(ctx.name)}</b> on ${esc(ctx.channel)}${ctx.to ? " (" + esc(ctx.to) + ")" : ""}? It goes out exactly as written.
+      <button class="btn primary" data-send-yes="${esc(key)}">Confirm send</button><button class="btn" data-send-no="${esc(key)}">Cancel</button></div>` : "";
+  const body = key && draftEditing.has(key) ? `<textarea class="dedit" data-edtext="${esc(key)}" rows="${Math.max(6, text.split("\n").length + 1)}">${esc(text)}</textarea>` : `<pre>${esc(text)}</pre>`;
+  return `<div class="draft"><div class="dh"><b>${esc(label)}</b><span class="dtools">${tools}</span></div>${subject ? `<div class="subj">${esc(subject)}</div>` : ""}${body}${confirmLine}${statusLine}</div>`;
 }
+async function fireSend(key){
+  const c = sendCtx.get(key); if (!c) return;
+  const text = edits.get(key) || "";
+  const logId = safeId(key) + "-" + Date.now().toString(36);
+  confirming.delete(key); sendState.set(key, {status:"sending", logId}); render();
+  if (!mcp){ sendState.set(key, {status:"failed", error:"open the tracker in claude.ai to send"}); render(); return; }
+  const payload = {key, logId, channel:c.channel, name:c.name, firm:c.firm || "", threadUrl:c.threadUrl || "", profileUrl:c.profileUrl || "", emailUrl:c.emailUrl || "", to:c.to || "", subject:c.subject || "", text};
+  try {
+    if (db) db.collection("sendlog").doc(logId).set({status:"sending", key, name:c.name, channel:c.channel, at:new Date().toISOString(), error:""}).catch(() => {});
+    await mcp.callTool("Claude Code Remote", "fire_trigger", {trigger_id: SEND_TRIGGER, text: JSON.stringify(payload)});
+  } catch(e){
+    sendState.set(key, {status:"failed", error: e.code === "not_in_manifest" || e.code === "approval_required" ? "the page needs your OK, press Send again and allow it" : "could not start sending"}); render();
+  }
+}
+document.addEventListener("input", e => { const k = e.target.dataset?.edtext; if (k) edits.set(k, e.target.value); });
+document.addEventListener("click", e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.editDraft){ draftEditing.add(t.dataset.editDraft); render(); }
+  else if (t.dataset.edone){ draftEditing.delete(t.dataset.edone); render(); }
+  else if (t.dataset.send){ draftEditing.delete(t.dataset.send); confirming.add(t.dataset.send); render(); }
+  else if (t.dataset.sendNo){ confirming.delete(t.dataset.sendNo); render(); }
+  else if (t.dataset.sendYes) fireSend(t.dataset.sendYes);
+});
 document.querySelectorAll("[data-tri]").forEach(el => { const k = el.dataset.tri, s = SRC[k];
   el.innerHTML = `<div class="tri-head"><div><h2>${s.title}</h2><p class="tri-meta" id="tri-meta-${k}">Not checked yet.</p></div><button class="btn primary" data-run="${k}" id="tri-run-${k}">${s.btn}</button></div>
     <p class="tri-note" id="tri-note-${k}" hidden></p><div class="tri-groups" id="tri-groups-${k}"></div>`; });
@@ -770,7 +821,7 @@ function renderProspects(){
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
       `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
       split(`${emailLine(p)}
-       <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject)))).join("")
+       <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject, p.kind === "p" && p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)))).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and rates each guess high, medium or low.</p>`;
 }
 async function prospectAction(act, id){
@@ -857,6 +908,12 @@ show((location.hash || "").slice(1));
     db.collection(kind).onSnapshot(snap => { state[kind] = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); },
       () => setSave(false, "Lost connection, reload to retry"));
   });
+  db.collection("sendlog").orderBy("at").onSnapshot(snap => {
+    snap.docs.forEach(d => { const x = d.data(); if (!x.key) return; const cur = sendState.get(x.key);
+      if (!cur || !cur.logId || cur.logId === d.id || x.status !== "sending") sendState.set(x.key, {...x, logId: d.id});
+      if (x.status === "sent" && x.key.startsWith("cold:")){ const pid = x.key.slice(5); const p = prospects.find(q => q.id === pid); if (p && (p.status || "New") === "New") prospectAction("em", pid); } });
+    render();
+  }, () => {});
   db.doc("triage/done").onSnapshot(x => { doneMap = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
   db.collection("prospects").onSnapshot(snap => { prospects = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); }, () => {});
   Object.entries(SRC).forEach(([k, s]) => {
