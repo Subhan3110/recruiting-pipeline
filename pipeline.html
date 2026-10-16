@@ -806,12 +806,43 @@ document.addEventListener("click", async e => {
   }
 });
 
+
+/* ---------- local preview: sample data when opened outside claude.ai ---------- */
+function loadSample(){
+  setSave(false, "Local preview, sample data, edits are not kept");
+  const d = n => { const x = new Date(); x.setDate(x.getDate() - n); return x.toISOString().slice(0,10); };
+  state.applications = [
+    {id:"s1", company:"Sample Bank", role:"2027 IB Summer Analyst", location:"London", status:"HireVue", applied:d(20), deadline:d(-3), notes:"Sample row. HireVue invite received."},
+    {id:"s2", company:"Example Securities", role:"2027 S&T Summer Analyst", location:"London", status:"Online test", applied:d(12), notes:"Sample row. Numerical test invite."},
+    {id:"s3", company:"Demo Capital", role:"Off-cycle Internship", location:"London", status:"Applied", applied:d(5), notes:"Sample row."},
+    {id:"s4", company:"Nordic Example", role:"Graduate Programme 2027", location:"Oslo", status:"Rejected", rejectedAt:"Online test", applied:d(40), notes:"Sample row."},
+    {id:"s5", company:"Test Partners", role:"Insight Event", location:"London", status:"Rejected", applied:d(30), notes:"Sample row (event, excluded from funnel)."},
+    {id:"s6", company:"Mock Advisors", role:"Summer Internship", location:"London", status:"Preparing", notes:"Sample row."}
+  ];
+  state.outreach = [
+    {id:"o1", name:"Alex Sample", firm:"Sample Bank", title:"Associate", channel:"LinkedIn", status:"Call booked", sent:d(10), notes:"Sample contact."},
+    {id:"o2", name:"Kari Eksempel", firm:"Nordic Example", title:"Analyst", channel:"LinkedIn", status:"Sent", sent:d(9), notes:"Sample contact, follow-up due."},
+    {id:"o3", name:"Jamie Demo", firm:"Demo Capital", title:"VP", channel:"Email", status:"Replied", sent:d(6), address:"jamie.demo@example.com", notes:"Sample contact."}
+  ];
+  prospects = [{id:"p1", name:"Ola Prospect", firm:"Example Securities", title:"Analyst, Equity Sales", location:"London", why:"Sample: BI alum on an equity sales desk", status:"New", foundAt:new Date().toISOString(),
+    liDraft:"Hei Ola! Sample connection note. Hilsen Subhan", emailGuess:"ola.prospect@example.com", emailConfidence:"medium", emailPattern:"first.last@example.com",
+    emailSubject:"Sample subject", emailBody:"Hi Ola, this is a sample cold email. Would you have 15 minutes next week? Best, Subhan Butt, MSc Finance, Imperial College London"}];
+  const triItem = (name, firm, bucket, gist, draft) => ({name, firm, bucket, lastFrom: bucket === "followup" || bucket === "waiting" ? "you" : "them", lastDate:d(3), gist, suggestion:"Sample suggestion.", draft});
+  tri.li.data = {status:"done", runAt:new Date().toISOString(), items:[
+    triItem("Alex Sample","Sample Bank","reply","Sample: asked when you are free for a call.","Hi Alex! Thursday 14:00 or Friday 10:00 both work for me. Looking forward to it. Best, Subhan"),
+    triItem("Kari Eksempel","Nordic Example","followup","Sample: no reply to your first message.","Hei Kari! Sample follow-up with a new angle. Hilsen Subhan"),
+    triItem("Friend Sample","","none","Sample: casual chat.","")]};
+  tri.em.data = {status:"done", runAt:new Date().toISOString(), items:[
+    triItem("Jamie Demo","Demo Capital","thank","Sample: shared advice on the off-cycle process.","Hi Jamie, sample thank-you email. Best, Subhan Butt, MSc Finance, Imperial College London")]};
+  triage = tri.li.data;
+  render();
+}
 /* ---------- boot ---------- */
 show((location.hash || "").slice(1));
 (async () => { mcp = await window.claude?.use?.("mcp"); })();
 (async () => {
   db = await window.claude?.use?.("db");
-  if (!db){ setSave(false, "Offline view, edits are not kept"); return; }
+  if (!db){ loadSample(); return; }
   setSave(true, "Saved automatically");
   ["applications","outreach"].forEach(kind => {
     db.collection(kind).onSnapshot(snap => { state[kind] = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); },
