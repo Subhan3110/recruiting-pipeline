@@ -738,8 +738,13 @@ function draftBox(label, text, subject, ctx){
   let tools = `<button class="copy" data-copy="${id}">Copy</button>`;
   if (key && !sent){
     tools = (draftEditing.has(key) ? `<button class="copy" data-edone="${esc(key)}">Done</button>` : `<button class="copy" data-edit-draft="${esc(key)}">Edit</button>`) + tools +
-      (st?.status === "sending" ? `<span class="sstat">Sending…</span>` : `<button class="copy send" data-send="${esc(key)}">Send</button>`);
+      (st?.status === "sending" ? `<span class="sstat">Sending…</span>`
+        : ctx.channel === "LinkedIn" ? `<a class="copy send" data-lisend="${esc(key)}" href="${esc(ctx.threadUrl || ctx.profileUrl || "https://www.linkedin.com/messaging/")}" target="_blank" rel="noopener">Send</a>`
+        : `<button class="copy send" data-send="${esc(key)}">Send</button>`);
   }
+  if (key && !sent && st?.status === "opened") return `<div class="draft"><div class="dh"><b>${esc(label)}</b><span class="dtools">${tools}</span></div><pre>${esc(text)}</pre>
+    <div class="sconfirm">${st.copied ? "Copied. In LinkedIn: click the message box, paste (⌘V) and press Send." : "Select the text above, copy it, then paste it in LinkedIn and press Send."}
+      <button class="btn primary" data-msent="${esc(key)}">Done, mark sent</button></div></div>`;
   const statusLine = sent ? `<div class="sline ok">Sent ✓ ${esc(st?.at ? new Date(st.at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "")}</div>`
     : st?.status === "failed" ? `<div class="sline err">Not sent: ${esc(st.error || "unknown reason")}. Fix it and press Send again.</div>` : "";
   const confirmLine = key && confirming.has(key) ? `<div class="sconfirm">Send this to <b>${esc(ctx.name)}</b> on ${esc(ctx.channel)}${ctx.to ? " (" + esc(ctx.to) + ")" : ""}? It goes out exactly as written.
@@ -762,6 +767,13 @@ async function fireSend(key){
   }
 }
 document.addEventListener("input", e => { const k = e.target.dataset?.edtext; if (k) edits.set(k, e.target.value); });
+/* LinkedIn: no reliable way to send from a cloud run, so Send copies the text and opens the conversation */
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-lisend]"); if (!a) return;
+  const key = a.dataset.lisend, text = edits.get(key) || "";
+  draftEditing.delete(key); sendState.set(key, {status:"opened", copied:false});
+  navigator.clipboard.writeText(text).then(() => sendState.set(key, {status:"opened", copied:true}), () => {}).finally(() => render());
+});
 document.addEventListener("click", e => {
   const t = e.target.closest("button"); if (!t) return;
   if (t.dataset.editDraft){ draftEditing.add(t.dataset.editDraft); render(); }
@@ -909,9 +921,13 @@ show((location.hash || "").slice(1));
       () => setSave(false, "Lost connection, reload to retry"));
   });
   db.collection("sendlog").orderBy("at").onSnapshot(snap => {
-    snap.docs.forEach(d => { const x = d.data(); if (!x.key) return; const cur = sendState.get(x.key);
-      if (!cur || !cur.logId || cur.logId === d.id || x.status !== "sending") sendState.set(x.key, {...x, logId: d.id});
-      if (x.status === "sent" && x.key.startsWith("cold:")){ const pid = x.key.slice(5); const p = prospects.find(q => q.id === pid); if (p && (p.status || "New") === "New") prospectAction("em", pid); } });
+    const ids = new Set(snap.docs.map(d => d.id)), latest = new Map();
+    snap.docs.forEach(d => { const x = d.data(); if (x.key) latest.set(x.key, {...x, logId: d.id}); });
+    latest.forEach((x, k) => { const cur = sendState.get(k);
+      if (cur?.status === "opened") return;
+      if (cur?.status === "sending" && cur.logId && !ids.has(cur.logId)) return;
+      sendState.set(k, x);
+      if (x.status === "sent" && k.startsWith("cold:")){ const pid = k.slice(5); const p = prospects.find(q => q.id === pid); if (p && (p.status || "New") === "New") prospectAction("em", pid); } });
     render();
   }, () => {});
   db.doc("triage/done").onSnapshot(x => { doneMap = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
