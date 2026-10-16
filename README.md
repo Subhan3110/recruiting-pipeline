@@ -70,3 +70,18 @@ The **Companies** tab derives a combined view from existing `applications`, `out
 ### Deployment and checks
 
 The JavaScript was checked for parse errors when committed. Browser/Artifact permissions and the external Claude Gmail trigger still need a live integration test. As before, GitHub changes do not automatically publish the live Claude artifact—publish the updated `pipeline.html` in your Claude Out Reach project.
+
+## Visual redesign and Profile & Docs
+
+The interface now uses a compact editorial-finance visual system (Manrope headings, restrained blue emphasis, a sticky segmented navigation, improved KPI/cards/tables, accessible keyboard focus states and responsive mobile layouts). Existing Overview, LinkedIn, Email, Applications and Companies functionality is retained.
+
+The new **Profile & Docs** tab has:
+
+- Candidate identity fields: name, email, phone, location, headline, LinkedIn URL and reusable talking points. These sync via `profile/main` in the **Claude Artifact database** when used inside claude.ai.
+- A **synced document link** library, saved as one document per entry in Claude DB collection `profile_documents`. Supports CV, cover letter, transcript, references, certificate and other categories, version labels, and copy/open actions.
+- **Local file uploads** for PDF, DOC, DOCX, TXT, RTF, PNG, JPG/JPEG, up to 10 MB per file. Binary data is stored **only in this browser's IndexedDB** (database `recruiting-pipeline-documents`, store `files`). Uploads are not synced to Claude, GitHub or any other device. This is for convenient local access, **not backup or secure cloud storage**.
+- Document category filters, quick access to the most recent CV, download/remove controls and a **Copy candidate brief** button for use with multiple AI assistants. The copied brief includes profile text and *synced URLs*, but excludes binary local files.
+
+**Privacy and safety:** Do not add identity documents, passport scans, bank information, private academic records, or other highly sensitive material as public links. Cloud links retain the permission rules of their original hosting service. Review recipients and access rights before sharing links. Local browser storage may be unavailable or cleared by the browser / embedded Artifact sandbox. The app checks for storage support and shows an error if it cannot persist uploads. External URLs are restricted to HTTPS and open with `rel="noopener noreferrer"`.
+
+**Deployment:** Only `pipeline.html` and `README.md` are stored on GitHub. Uploads and personal profile data are **not** committed to this repository. Publishing the new version within the existing Claude Artifact is still a separate step and needs live testing of Claude DB permissions and browser file storage.
