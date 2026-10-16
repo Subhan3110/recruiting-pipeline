@@ -516,7 +516,8 @@ function renderToday(triItems){
   const fuRows = state.outreach.filter(overdue).filter(r => !fuNames.has(nameKey(r.name)) && !dismissed["fu:" + r.id]);
   const warm = state.applications.filter(a => ["Applied","Online test","HireVue","Interview"].includes(a.status))
     .filter(a => !dismissed["w:" + a.id]).map(a => ({a, c: contactsFor(a).filter(o => ["Replied","Call booked","Call done"].includes(o.status))})).filter(x => x.c.length);
-  const newP = prospects.filter(p => (p.status || "New") === "New").sort((a,b) => (!!b.connected - !!a.connected) || String(b.foundAt||"").localeCompare(String(a.foundAt||""))).slice(0, 6);
+  const openP = prospects.filter(p => (p.status || "New") === "New").sort((a,b) => (!!b.connected - !!a.connected) || String(b.foundAt||"").localeCompare(String(a.foundAt||"")));
+  const newP = [...openP.filter(p => !p.emailOnly).slice(0, 6), ...openP.filter(p => p.emailOnly).slice(0, 3)];
   const triRow = i => item("t:" + triKey(i), `<strong>${esc(i.name)}<span class="tag">${esc(i.ch)}</span></strong><span class="m">${esc(i.firm || "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${fmt(i.lastDate)}</span>`, triBody(i), "d:" + triKey(i));
   const groups = [
     ["dl","Deadlines","Tests and HireVues not yet completed","--s-bad", dl.map(x => item("dl:" + x.r.id,
@@ -530,8 +531,10 @@ function renderToday(triItems){
     ["warm","Warm leads","Live applications where you know someone","--s-hv", warm.map(x => item("w:" + x.a.id,
       `<strong>${esc(x.a.company)}</strong><span class="m">${esc(x.a.status)}</span><span class="g">${esc(x.c.map(o => o.name).join(", "))}</span>`,
       `<p class="gist">${esc(x.a.role || "")}</p><p class="sug">Let ${esc(x.c[0].name)} know where you are in the process. A short update keeps you top of mind when the desk discusses candidates.</p>`, "d:w:" + x.a.id))],
-    ["new","New people","Connections to message and people to add","--s-prep", newP.map(p => item("np:" + p.id,
-      `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g">${esc(p.why || "")}</span>`,
+    ["new","New people","LinkedIn people and cold emails to send","--s-prep", newP.map(p => item("np:" + p.id,
+      `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g">${esc(p.why || "")}</span>${p.emailOnly ? '<span class="tag">Email</span>' : ""}`,
+      p.emailOnly ? split(`<p class="gist">${esc(p.why || "")}</p>${emailLine(p)}<div class="acts">${p.sourceUrl ? `<a class="btn" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener">Source</a>` : ""}<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button></div>`,
+        draftBox("Cold email", p.emailBody, p.emailSubject, p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)) :
       split(`<p class="gist">${esc(p.why || "")}</p><div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id))]
   ];
   if (!todayInit && groups.some(g => g[4].length)){ todayInit = true; groups.forEach(g => { if (g[4].length && ["dl","reply","thank"].includes(g[0])) openKeys.add("today:" + g[0]); }); }
@@ -858,7 +861,8 @@ function emailLine(p){
 }
 function renderProspects(){
   const open = prospects.filter(p => (p.status || "New") === "New").sort((a,b) => String(b.foundAt||"").localeCompare(String(a.foundAt||"")));
-  $("pros-li").innerHTML = open.length ? open.map(p => item("p:" + p.id,
+  const openLi = open.filter(p => !p.emailOnly);
+  $("pros-li").innerHTML = openLi.length ? openLi.map(p => item("p:" + p.id,
       `<strong>${esc(p.name)}${p.connected ? '<span class="tag">Connected</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
       split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${emailLine(p)}
        <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id)).join("")
