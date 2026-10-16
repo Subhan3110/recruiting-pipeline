@@ -247,6 +247,10 @@ td.notes{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellips
 .tablewrap.flat{border:0;border-top:1px solid var(--line);border-radius:0}
 .chip b{font-family:var(--mono);font-weight:500;margin-left:2px}
 td .tag{margin:0 4px 0 0}
+
+a.mail{font-size:11px;margin-left:8px;color:var(--accent);text-decoration:none;white-space:nowrap}
+a.mail:hover{text-decoration:underline}
+.it .acts a.btn{text-decoration:none}
 </style>
 
 <div class="wrap">
@@ -470,6 +474,11 @@ function renderOverview(){
   renderToday(triItems);
 }
 
+function mailBtn(r, big){
+  if (!r.emailUrl) return "";
+  return big ? `<div class="acts"><a class="btn primary" href="${esc(r.emailUrl)}" target="_blank" rel="noopener">Open in Gmail${r.emailLabel ? ": " + esc(r.emailLabel) : ""}</a></div>`
+    : `<a class="mail" href="${esc(r.emailUrl)}" target="_blank" rel="noopener" title="${esc(r.emailLabel || "Open the email in Gmail")}">✉ email</a>`;
+}
 function triKey(i){ return i.ch + ":" + i.bucket + ":" + nameKey(i.name); }
 function doneTag(key){ return doneMap[key] ? `<span class="tag ok">Sent ${fmt(doneMap[key])}</span>` : ""; }
 const triMap = new Map();
@@ -494,7 +503,7 @@ function renderToday(triItems){
   const groups = [
     ["dl","Deadlines","Tests and HireVues not yet completed","--s-bad", dl.map(x => item("dl:" + x.r.id,
       `<strong>${esc(x.r.company)}</strong><span class="m">${esc(x.r.status)}</span><span class="g">${esc(x.r.role || "")}</span><span class="d ${x.passed || (x.d != null && x.d <= 3) ? "hot" : ""}">${x.label}</span>`,
-      `<p class="gist">${esc(x.r.notes || "No notes.")}</p><p class="sug">${x.r.deadline ? "Deadline " + fmt(x.r.deadline) + ". " : "No deadline in the emails. Check the portal. "}When done, add "Completed" to the notes or move the status.</p>`))],
+      `<p class="gist">${esc(x.r.notes || "No notes.")}</p><p class="sug">${x.r.deadline ? "Deadline " + fmt(x.r.deadline) + ". " : "No deadline in the emails. Check the portal. "}When done, write "done" in the notes or move the status.</p>${mailBtn(x.r, true)}`))],
     ["reply","Needs your reply","They asked something or proposed a next step","--s-int", open.filter(i => i.bucket === "reply").map(triRow)],
     ["thank","Send a thank-you","They helped or you met","--s-good", open.filter(i => i.bucket === "thank").map(triRow)],
     ["followup","Follow up","7+ days without an answer","--s-sent", [...open.filter(i => i.bucket === "followup").map(triRow), ...fuRows.map(r => item("fu:" + r.id,
@@ -555,7 +564,7 @@ function renderApps(){
     .sort((a,b) => String(b.applied || "").localeCompare(String(a.applied || "")));
   const pill = r => `<span class="pill" style="--c:var(${color("applications", r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="applications">${STAT.applications.map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
   const dash = '<span class="blank">–</span>';
-  const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><strong>${esc(r.company)}</strong><small>${esc(r.role || "")}</small></td>
+  const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><strong>${esc(r.company)}</strong><small>${esc(r.role || "")}</small>${mailBtn(r)}</td>
     <td><span class="tag">${typeOf(r)}</span>${c.length ? `<span class="tag warm" title="${esc(c.map(o => o.name + " (" + o.status + ")").join(", "))}">${c.length} contact${c.length > 1 ? "s" : ""}</span>` : ""}</td>
     <td>${esc(r.location || "")}</td><td>${pill(r)}</td><td class="num">${fmt(r.applied) || dash}</td>
     <td class="num ${r.deadline && -days(r.deadline) <= 3 && -days(r.deadline) >= 0 ? "overdue" : ""}">${fmt(r.deadline) || dash}</td>
