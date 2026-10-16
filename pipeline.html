@@ -480,7 +480,7 @@ function triBody(i){
 }
 function renderToday(triItems){
   const open = triItems.filter(i => !doneMap[triKey(i)]);
-  const testsLive = state.applications.filter(r => (r.status === "Online test" || r.status === "HireVue") && !/completed/i.test(r.notes || ""));
+  const testsLive = state.applications.filter(r => (r.status === "Online test" || r.status === "HireVue") && !/\b(completed|submitted|done)\b/i.test(r.notes || ""));
   const dl = testsLive.map(r => {
     const d = r.deadline ? -days(r.deadline) : null, passed = /deadline passed/i.test(r.notes || "") || (d != null && d < 0);
     return {r, d, passed, label: passed ? "Deadline passed" : d != null ? (d === 0 ? "Due today" : "Due in " + d + "d") : "Check portal"};
