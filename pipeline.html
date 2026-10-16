@@ -1151,14 +1151,22 @@ async function downloadLocalDocument(id){
   try{
     const item=await idbOperation("readonly",store=>store.get(id));
     if(!item?.blob)throw new Error("File missing");
+    const dl=await window.claude?.use?.("downloads");
+    if(dl){
+      try{await dl.save({filename:row.fileName||"document.pdf",data:item.blob});}
+      catch(err){ if(err?.code!=="declined") $("doc-upload-note").textContent=err?.code==="rejected_extension"
+        ?"This file type can't be downloaded from the artifact (PDF, DOCX, TXT and images work).":"Download unavailable here."; }
+      return;
+    }
     const url=URL.createObjectURL(item.blob), a=document.createElement("a");
     a.href=url;a.download=row.fileName||"document";document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),30000);
   }catch(e){$("doc-upload-note").textContent="Could not download this local file.";}
 }
-async function removeProfileDocument(id,storage){
+async function removeProfileDocument(id,storage,btn){
   const doc=(storage==="local"?localDocuments:syncedDocuments).find(d=>d.id===id);
-  if(!doc||!confirm(`Remove "${doc.title||doc.fileName||"document"}" from this library?`))return;
+  if(!doc)return;
+  if(btn && btn.dataset.armed!=="1"){btn.dataset.armed="1";btn.textContent="Click again to remove";setTimeout(()=>{if(btn.isConnected){btn.dataset.armed="";btn.textContent="Remove";}},4000);return;}
   try{
     if(storage==="local"){
       await idbOperation("readwrite",store=>store.delete(id));
@@ -1208,7 +1216,7 @@ document.addEventListener("click",async e=>{
   const b=e.target.closest("button");if(!b)return;
   if(b.dataset.docFilter){documentFilter=b.dataset.docFilter;renderProfile();}
   else if(b.dataset.docDownload)downloadLocalDocument(b.dataset.docDownload);
-  else if(b.dataset.docDelete)removeProfileDocument(b.dataset.docDelete,b.dataset.docStorage);
+  else if(b.dataset.docDelete)removeProfileDocument(b.dataset.docDelete,b.dataset.docStorage,b);
   else if(b.dataset.docCopy){
     const d=syncedDocuments.find(x=>x.id===b.dataset.docCopy);
     if(!d||!httpsLink(d.url))return;
