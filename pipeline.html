@@ -550,6 +550,7 @@ async function markSent(key){
   const d = today0();
   doneMap = {...doneMap, [key]: d}; render();
   if (db) db.doc("triage/done").set({items: doneMap}).catch(() => setSave(false, "Not saved, try again"));
+  showToast(`${i.name} marked as sent`, () => { doneMap = {...doneMap}; delete doneMap[key]; render(); if (db) db.doc("triage/done").set({items: doneMap}).catch(() => {}); });
   const o = state.outreach.find(r => nameKey(r.name) === nameKey(i.name));
   if (o){
     const up = {lastContact: d};
@@ -846,10 +847,13 @@ function trashIt(spec, undo){
     if (db) db.doc("triage/dismissed").set({items: dismissed}).catch(() => setSave(false, "Not saved, try again"));
   }
   if (undo) return;
+  showToast("Removed", () => trashIt(spec, true));
+}
+function showToast(msg, undoFn){
   document.querySelector(".toast")?.remove(); clearTimeout(undoTimer);
-  const el = document.createElement("div"); el.className = "toast"; el.innerHTML = `Removed <button>Undo</button>`;
-  el.querySelector("button").onclick = () => { el.remove(); trashIt(spec, true); };
-  document.body.appendChild(el); undoTimer = setTimeout(() => el.remove(), 6000);
+  const el = document.createElement("div"); el.className = "toast"; el.innerHTML = `${esc(msg)} <button>Undo</button>`;
+  el.querySelector("button").onclick = () => { el.remove(); undoFn(); };
+  document.body.appendChild(el); undoTimer = setTimeout(() => el.remove(), 8000);
 }
 document.addEventListener("click", e => { const b = e.target.closest("button.trash"); if (!b) return; e.preventDefault(); e.stopPropagation(); trashIt(b.dataset.trash); }, true);
 document.addEventListener("toggle", e => { const d = e.target; if (d.matches?.("details.it, details.cat")) { d.open ? openKeys.add(d.dataset.key) : openKeys.delete(d.dataset.key); } }, true);
@@ -867,22 +871,41 @@ function renderProspects(){
       split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${emailLine(p)}
        <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
+  $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New"), "li");
   const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
       `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
       split(`${emailLine(p)}
        <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject, p.kind === "p" && p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and rates each guess high, medium or low.</p>`;
+  $("pros-em").innerHTML += doneList(prospects.filter(p => (p.emailGuess || p.emailBody) && p.status && p.status !== "New"), "em");
+}
+/* people already contacted or skipped: kept so the address and draft are never lost */
+function doneList(list, k){
+  if (!list.length) return "";
+  const key = "done:" + k;
+  return `<details class="cat" data-key="${key}" style="--c:var(--s-cold)"${openKeys.has(key) ? " open" : ""}><summary><span class="cl">Contacted or skipped</span><span class="cs">Address and message kept here</span><b>${list.length}</b></summary><div class="ilist">${list.map(p => item("pd:" + k + ":" + p.id,
+    `<strong>${esc(p.name)}<span class="tag">${esc(p.status)}</span></strong><span class="m">${esc(p.firm || "")}</span><span class="g ${k === "em" ? "addr-i" : ""}">${esc(k === "em" ? (p.emailGuess || "") : (p.why || ""))}</span>`,
+    split(`${k === "em" ? emailLine(p) : `<p class="gist">${esc(p.why || "")}</p>`}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn" data-pact="undo" data-pid="${p.id}">Move back to new</button></div>`,
+      k === "em" ? draftBox("Cold email", p.emailBody, p.emailSubject) : draftBox(p.connected ? "Message" : "Connection note", p.liDraft)))).join("")}</div></details>`;
 }
 async function prospectAction(act, id){
   const p = prospects.find(x => x.id === id); if (!p) return;
   const now = new Date().toISOString().slice(0,10);
+  if (act === "undo"){
+    if (p.status === "Contacted" && state.outreach.some(r => r.id === id && r.sent === p.contactedAt)) write("outreach", id, null, "delete");
+    p.status = "New"; render();
+    if (db) db.collection("prospects").doc(id).update({status:"New"}).catch(() => setSave(false, "Not saved, try again"));
+    return;
+  }
+  const hadRow = state.outreach.some(r => r.id === id);
   if (act === "li" || act === "em"){
     write("outreach", id, {name:p.name, firm:p.firm || "", title:p.title || "", channel: act === "li" ? "LinkedIn" : "Email", status:"Sent", sent:now,
       ...(act === "em" ? {address:p.emailGuess || ""} : {profile:p.profileUrl || ""}), notes:p.why || ""});
   }
-  p.status = act === "skip" ? "Skipped" : "Contacted"; render();
-  if (db) try { await db.collection("prospects").doc(id).update({status:p.status}); } catch(e){ setSave(false, "Not saved, try again"); }
+  p.status = act === "skip" ? "Skipped" : "Contacted"; if (p.status === "Contacted" && !hadRow) p.contactedAt = now; render();
+  showToast(act === "skip" ? `Skipped ${p.name}` : `${p.name} marked as sent`, () => prospectAction("undo", id));
+  if (db) try { await db.collection("prospects").doc(id).update({status:p.status, ...(p.contactedAt ? {contactedAt:p.contactedAt} : {})}); } catch(e){ setSave(false, "Not saved, try again"); }
 }
 
 async function runCheck(k){
