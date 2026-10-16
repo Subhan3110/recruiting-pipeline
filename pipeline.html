@@ -197,6 +197,7 @@ td.notes{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellips
 .tile.on span{color:var(--ink)}
 .ilist{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .ilist > .empty-note{padding:12px}
+.tri-sum{margin:0;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--s-hv);border-radius:6px;font-size:13px}
 .tri-groups{display:grid;gap:8px}
 .it{border-bottom:1px solid var(--line)}
 .it:last-child{border-bottom:0}
@@ -348,6 +349,7 @@ a.mail:hover{text-decoration:underline}
       <div class="kpi"><span class="n" id="ap-o">0</span><span class="l">Offers</span></div>
     </div>
     <div><h2 class="sec">Funnel <span>Reached each stage or later</span></h2><div class="fun" id="fn-ap"></div></div>
+    <div style="display:grid;gap:14px" data-tri="ap"></div>
     <div style="display:grid;gap:12px" data-table="applications"></div>
   </section>
 </div>
@@ -630,7 +632,7 @@ function render(){
   renderStats();
   if (view === "overview") renderOverview();
   else renderTable(view);
-  if (view === "applications") appFunnel("fn-ap");
+  if (view === "applications"){ appFunnel("fn-ap"); renderTriage("ap"); }
   if (view === "linkedin") outFunnel("fn-li", ofCh("LinkedIn"));
   if (view === "email") outFunnel("fn-em", ofCh("Email"));
   if (view === "linkedin"){ renderTriage("li"); renderProspects(); }
@@ -702,9 +704,13 @@ const SRC = {
        err:"The last check could not read LinkedIn. Open Chrome, make sure you're signed in, and try again.",
        empty:"Press Check LinkedIn and your conversations show up here, sorted by what you need to do, with a draft for each."},
   em: {title:"Email inbox", btn:"Check email", trigger:"trig_01DbAW5zikY9RUvv4a1NcSu1", doc:"emailtriage/latest", run:"emailtriage/run",
-       running:"Reading Gmail, logging applications and looking up email addresses. Results land here in a few minutes.",
+       running:"Reading your recruiting emails and looking up email addresses. Results land here in a few minutes.",
        err:"The last check could not read Gmail. Check the Gmail connector in claude.ai settings and try again.",
-       empty:"Press Check email to sort your recruiting emails, log new applications from Gmail and find addresses for your prospects."}
+       empty:"Press Check email to sort your recruiting emails and find addresses for your prospects."},
+  ap: {title:"Applications from Gmail", btn:"Check applications", trigger:"trig_01BGkh6wBdKA55RAuZdsqvdD", doc:"apptriage/latest", run:"apptriage/run",
+       running:"Scanning Gmail for confirmations, tests, HireVues, interviews and rejections. Only emails since the last check, so it is quick.",
+       err:"The last check could not read Gmail. Check the Gmail connector in claude.ai settings and try again.",
+       empty:"Press Check applications to log new applications and status changes from Gmail."}
 };
 const BUCKETS = [
   ["reply","Needs your reply","They asked something or proposed a next step","--s-int"],
@@ -712,7 +718,7 @@ const BUCKETS = [
   ["followup","Follow up","You messaged 7+ days ago, no answer","--s-sent"],
   ["waiting","Waiting","Sent recently, give it time","--s-prep"]
 ];
-const tri = {li:{data:null, req:null}, em:{data:null, req:null}};
+const tri = {li:{data:null, req:null}, em:{data:null, req:null}, ap:{data:null, req:null}};
 let triage = null; /* LinkedIn triage, used by Overview */
 let prospects = [];
 const drafts = new Map(); let draftSeq = 0;
@@ -801,6 +807,7 @@ function renderTriage(k){
   if (running){ note.hidden = false; note.className = "tri-note"; note.textContent = s.running; }
   else if (t.data?.status === "error"){ note.hidden = false; note.className = "tri-note err"; note.textContent = t.data.message || s.err; }
   else if (!note.dataset.sticky) note.hidden = true;
+  if (k === "ap"){ $("tri-groups-ap").innerHTML = t.data?.status === "done" && t.data.summary ? `<p class="tri-sum">${esc(t.data.summary)}</p>` : (t.data ? "" : `<p class="empty-note">${s.empty}</p>`); return; }
   const items = t.data?.items || [];
   if (!items.length){ $("tri-groups-" + k).innerHTML = `<p class="empty-note">${s.empty}</p>`; return; }
   const cats = [...BUCKETS, ["none","No action","Friends, ads, closed","--s-cold"]];
