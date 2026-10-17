@@ -1,7 +1,7 @@
 <title>Recruiting Pipeline</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 /* Recruiting workspace — responsive navigation with six views, including a document vault. */
 :root{
@@ -494,44 +494,390 @@ tr:hover td{background:color-mix(in srgb,var(--soft) 38%,var(--surface))}
 @media(max-width:900px){.profile-layout{grid-template-columns:1fr}.profile-side{grid-template-columns:1fr 1fr}.profile-hero-right{display:none}}
 @media(max-width:650px){.profile-side,.doc-action-grid{grid-template-columns:1fr}.profile-form{grid-template-columns:1fr}.profile-form label.wide{grid-column:auto}.profile-hero{padding:18px}.doc-action-box{padding:15px}}
 
+
+/* ✳ RECRUITING PIPELINE — STUDIO EDITION
+   Expressive networking-first UI, deliberately lightweight.
+   This block supersedes earlier conservative utility styling. */
+:root{
+ --bg:#F6F5FC; --surface:#FFFFFF; --ink:#252344; --muted:#747590; --line:#E6E4F0; --soft:#F1F0F8;
+ --accent:#6953E4; --accent-ink:#FFFFFF; --ring:#EBE7FF; --shadow:0 10px 32px rgba(43,37,92,.055);
+ --display:"Space Grotesk",sans-serif; --body:"DM Sans",system-ui,sans-serif;
+ --s-prep:#8E92AA;--s-sent:#6E57DA;--s-test:#7F62DF;--s-int:#D78237;--s-good:#248A71;--s-bad:#D35565;--s-cold:#A8A6BB;--s-hv:#3D9C9B;--bar-ink:#FFFFFF;
+ --lime:#D8F883;--lavender:#D3C5FF;--peach:#FFC7AD;--mint:#B7EFE5;--hero-ink:#22213E;
+ color-scheme:light;
+}
+:root[data-theme="dark"]{
+ --bg:#151427;--surface:#201F38;--ink:#FAF8FF;--muted:#B1ADC9;--line:#393651;--soft:#2A2842;
+ --accent:#B6A7FF;--accent-ink:#24213E;--ring:#39315F;--shadow:0 12px 33px rgba(0,0,0,.12);
+ --s-prep:#A1A4BA;--s-sent:#AD9BFF;--s-test:#BF9EFF;--s-int:#FFBC79;--s-good:#8BE6C2;--s-bad:#FF9CA9;--s-cold:#72748E;--s-hv:#96E7DF;--bar-ink:#1D2136;
+ color-scheme:dark;
+}
+@media(prefers-color-scheme:dark){
+ :root:not([data-theme="light"]):not([data-theme="dark"]){
+  --bg:#151427;--surface:#201F38;--ink:#FAF8FF;--muted:#B1ADC9;--line:#393651;--soft:#2A2842;
+  --accent:#B6A7FF;--accent-ink:#24213E;--ring:#39315F;--shadow:0 12px 33px rgba(0,0,0,.12);
+  --s-prep:#A1A4BA;--s-sent:#AD9BFF;--s-test:#BF9EFF;--s-int:#FFBC79;--s-good:#8BE6C2;--s-bad:#FF9CA9;--s-cold:#72748E;--s-hv:#96E7DF;--bar-ink:#1D2136;
+  color-scheme:dark;
+ }
+}
+body{
+ background:radial-gradient(ellipse 55vw 36vw at -16% -5%,rgba(183,169,255,.18),transparent 74%),
+ radial-gradient(ellipse 50vw 42vw at 112% 15%,rgba(255,182,166,.10),transparent 74%),var(--bg);
+ letter-spacing:-.012em;
+}
+.wrap{max-width:1320px;padding-left:max(28px,env(safe-area-inset-left,0px));padding-right:max(28px,env(safe-area-inset-right,0px));}
+header{padding:25px 0 25px}
+.brand-lockup{gap:14px}
+.brand-mark{width:48px;height:48px;border-radius:17px;transform:rotate(-8deg);
+ background:linear-gradient(155deg,#836AF5,#654CDB);box-shadow:0 7px 16px rgba(95,71,194,.22);font:700 32px var(--display);
+ display:flex;align-items:center;justify-content:center}
+.brand-mark>span:first-child{transform:rotate(8deg) translateY(-2px)}
+.brand-mark .brand-spark{position:absolute!important;font:700 13px var(--display);right:5px;top:3px;color:var(--lime);transform:rotate(8deg)}
+.brand-mark::after{display:none}
+header .eyebrow{font:600 9px var(--mono);letter-spacing:.12em;color:var(--muted)}
+h1{font:700 29px/.98 var(--display);letter-spacing:-.065em}
+.brand-period{color:#8D75FF}
+.header-cycle{font:500 10px var(--mono);letter-spacing:.01em}
+.header-cycle span{color:var(--accent)}
+.save{border-radius:999px;background:var(--surface);padding:9px 12px;box-shadow:0 1px 3px rgba(38,26,72,.03)}
+.theme-switch{width:38px;height:38px;display:grid;place-items:center;flex:none;border:1px solid var(--line);
+ background:var(--surface);border-radius:12px;color:var(--ink);font-size:22px;cursor:pointer;transition:transform .2s,background .2s}
+.theme-switch:hover{transform:rotate(-12deg);background:var(--ring)}
+.header-add{background:var(--ink);color:var(--surface);border-color:transparent;padding:10px 15px}
+.header-add:hover{background:var(--accent);color:var(--accent-ink)}
+nav.top{position:sticky;top:7px;z-index:10;box-shadow:0 8px 27px rgba(43,37,92,.045);
+ border-radius:16px;padding:7px;gap:5px;margin-bottom:30px;background:var(--surface);}
+.ttab{font:700 12px var(--body);border-radius:11px;padding:11px 15px;display:flex;gap:7px;align-items:center;justify-content:center;transition:color .2s,background .2s}
+.ttab .nav-icon{font:700 15px var(--display);width:17px;text-align:center;color:var(--muted);margin:0}
+.ttab[aria-selected="true"]{color:var(--accent);background:var(--ring)}
+.ttab[aria-selected="true"] .nav-icon{color:var(--accent)}
+.ttab:hover:not([aria-selected="true"]){background:var(--soft);color:var(--ink)}
+.ttab>span:not(.nav-icon){margin-left:0;font-size:10px;color:var(--muted)}
+.ttab.profile-tab{margin-left:auto}
+.view{gap:24px}
+.overview-intro{
+ display:grid;grid-template-columns:minmax(0,1.12fr) minmax(340px,.88fr);gap:0;overflow:hidden;
+ min-height:348px;border-radius:24px;background:linear-gradient(125deg,#28234D 0%,#343064 57%,#4B3A81 100%);
+ color:#FBF9FF;box-shadow:0 18px 48px rgba(59,48,123,.16);padding:0;position:relative;isolation:isolate;
+}
+.overview-intro::before{content:"";position:absolute;width:470px;height:470px;border-radius:50%;background:rgba(145,116,255,.14);
+ filter:blur(40px);left:-180px;bottom:-360px;pointer-events:none}
+.hero-copy{padding:41px 0 35px 46px;display:flex;flex-direction:column;align-items:flex-start;position:relative;z-index:2}
+.hero-eyebrow{font:600 10px var(--mono);color:#E0D6FF;letter-spacing:.10em;display:flex;align-items:center;gap:8px}
+.hero-live{width:8px;height:8px;background:var(--lime);border-radius:50%;box-shadow:0 0 0 4px rgba(216,248,131,.15)}
+.overview-intro h2{font:700 clamp(33px,4.1vw,57px)/1.08 var(--display);letter-spacing:-.058em;margin:19px 0 12px;color:#FFF}
+.overview-intro h2 em{font-style:normal;color:var(--lime);position:relative}
+.hero-period{color:#FFB49E}
+.overview-intro p{color:#D8D4F5;font:400 14px/1.7 var(--body);max-width:405px;margin:4px 0 23px;letter-spacing:0}
+.overview-actions{display:flex;gap:10px}
+.overview-actions .btn{border-radius:12px;min-height:44px;padding:11px 17px;font-weight:700;font-size:12px}
+.hero-primary{color:#252348;background:var(--lime);border-color:var(--lime);box-shadow:0 6px 22px rgba(207,255,120,.14)}
+.hero-primary:hover{background:#EDFFC0;border-color:#EDFFC0;box-shadow:0 9px 26px rgba(207,255,120,.24)}
+.hero-secondary{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.24);color:#FFF;backdrop-filter:blur(6px)}
+.hero-secondary:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5);color:#FFF}
+.overview-actions .btn span{margin-left:12px;font-size:17px;line-height:.6}
+.hero-social-proof{display:flex;align-items:center;gap:12px;margin-top:auto;padding-top:23px;color:#D9D4F5;font-size:11px;flex-wrap:wrap}
+.hero-social-proof strong{font-weight:800;color:#FFF}
+.hero-social-proof i{font-style:normal;padding:0 5px;color:var(--lime)}
+.hero-mini-avatars{display:flex;padding-left:8px}
+.hero-mini-avatars span{width:27px;height:27px;border:2px solid #322957;border-radius:50%;display:grid;place-items:center;
+ margin-left:-8px;color:#292548;background:var(--peach);font-weight:700}
+.hero-mini-avatars span:nth-child(2){background:var(--lavender)}
+.hero-mini-avatars span:nth-child(3){background:var(--lime)}
+.hero-graphic{min-width:0;position:relative;display:grid;place-items:center;overflow:hidden}
+.hero-graphic::before{content:"";position:absolute;width:360px;height:360px;border-radius:50%;background:#7257B7;filter:blur(80px);opacity:.25}
+.hero-art-grid{position:absolute;inset:0;opacity:.25;background-image:radial-gradient(rgba(255,255,255,.28) 1px,transparent 1px);background-size:20px 20px;mask-image:linear-gradient(to left,#000,transparent)}
+.hero-graphic svg{width:min(100%,470px);max-height:340px;filter:drop-shadow(0 13px 24px rgba(14,10,41,.17));animation:network-float 7s ease-in-out infinite}
+.hero-floating-pill{position:absolute;border-radius:11px;padding:9px 13px;font:600 11px var(--body);white-space:nowrap;box-shadow:0 7px 22px rgba(8,5,25,.2)}
+.pill-top{background:rgba(255,255,255,.97);color:#403567;left:8%;top:16%;transform:rotate(-6deg)}
+.pulse-dot{width:7px;height:7px;display:inline-block;border-radius:50%;background:#41BDA4;margin-right:5px}
+.pill-bottom{background:var(--peach);color:#322447;right:5%;bottom:15%;transform:rotate(5deg)}
+@keyframes network-float{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-9px) rotate(1deg)}}
+@keyframes pop-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.kpis,.kpis.k4{display:grid;gap:12px;background:none;border:0;box-shadow:none;overflow:visible;grid-template-columns:repeat(5,minmax(0,1fr))}
+.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.kpi,.kpi+.kpi{position:relative;overflow:hidden;background:var(--surface);padding:18px 18px 19px;
+ border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);min-height:111px;transition:transform .2s,border-color .2s}
+.kpi::after{content:"✳";position:absolute;right:13px;top:8px;color:var(--accent);opacity:.28;font:700 18px var(--display)}
+.kpi:nth-child(2)::after{content:"↗";color:#1C978B;opacity:.7}
+.kpi:nth-child(3)::after{content:"◈";color:#DC8A69;opacity:.7}
+.kpi:nth-child(4)::after{content:"+";color:#B06BE1;opacity:.7}
+.kpi:nth-child(5)::after{content:"✦";color:#159F89;opacity:.7}
+.kpi:hover{transform:translateY(-2px);border-color:var(--accent)}
+.kpi .n{font:700 clamp(26px,3vw,32px)/1.15 var(--display);letter-spacing:-.052em}
+.kpi .l{font-weight:600;color:var(--muted);font-size:11px;line-height:1.45}
+.kpi:nth-child(2){background:color-mix(in srgb,var(--mint) 13%,var(--surface))}
+.kpi:nth-child(3){background:color-mix(in srgb,var(--peach) 12%,var(--surface))}
+.kpi:nth-child(5){background:color-mix(in srgb,var(--lavender) 14%,var(--surface))}
+.micro-header{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:-11px;padding:0 3px}
+.micro-header .section-eyebrow{margin:0;letter-spacing:.12em;color:var(--accent)}
+.micro-header>span:last-child{color:var(--muted);font-size:11px}
+.sources{gap:13px}
+.src{position:relative;overflow:hidden;border-radius:18px;padding:23px;border:1px solid var(--line);box-shadow:var(--shadow);gap:15px}
+.src::after{content:"";position:absolute;width:170px;height:170px;border-radius:50%;pointer-events:none;top:-112px;right:-70px;
+ background:var(--lavender);opacity:.34;transition:transform .3s}
+.src:hover::after{transform:scale(1.3)}
+.src:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 14px 32px rgba(59,48,123,.10)}
+.src .h{align-items:center;position:relative;z-index:1}
+.src-label{display:inline-flex;align-items:center;gap:10px}
+.src .h strong{font:700 16px var(--display)}
+.src .h>span:last-child{font-size:12px;font-weight:700;color:var(--accent)}
+.src-symbol{width:39px;height:39px;border-radius:12px;display:grid;place-items:center;
+ background:#5C7CF0;color:#FFF;font:700 19px var(--display);font-style:normal}
+.src-email .src-symbol{background:#F5A581;color:#583044}
+.src-applications .src-symbol{background:#B8A3EF;color:#322550}
+.src-email::after{background:var(--peach)}
+.src-applications::after{background:var(--mint)}
+.src .big{font:700 36px var(--display);letter-spacing:-.06em;position:relative;z-index:1}
+.src .big small{font:500 11px var(--body);letter-spacing:0}
+.src dl{border-top:1px solid var(--line);padding-top:12px;gap:8px;font-size:12px}
+.src dd{font-size:12px;font-weight:600}
+.section-heading{padding:2px 3px 0;align-items:center!important;margin-bottom:14px!important}
+.section-title{display:flex;align-items:center;gap:12px}
+.section-title>span:last-child{font:700 21px/1.1 var(--display);letter-spacing:-.055em}
+.section-title small{display:block;font:600 9px var(--mono);letter-spacing:.12em;color:var(--muted);margin-top:5px}
+.section-symbol{width:39px;height:39px;display:grid;place-items:center;border-radius:12px;font-size:18px}
+.symbol-lime{background:var(--lime);color:#363449}
+.section-heading>span:last-child{font:500 12px var(--body);color:var(--muted);letter-spacing:0}
+.channel-intro{display:flex;gap:21px;align-items:center;position:relative;min-height:160px;
+ border:1px solid var(--line);border-radius:21px;background:var(--surface);padding:28px 31px;
+ box-shadow:var(--shadow);isolation:isolate;overflow:hidden}
+.channel-intro::before{content:"";position:absolute;border-radius:50%;width:340px;height:340px;right:-100px;top:-220px;
+ background:var(--channel-tint);opacity:.36;pointer-events:none}
+.channel-intro::after{content:"✳";position:absolute;right:90px;bottom:-40px;color:var(--channel-tint);opacity:.32;
+ font:700 150px/1 var(--display);transform:rotate(-15deg);pointer-events:none}
+.channel-linkedin{--channel-tint:#BEADFF;--channel-block:#6854CF}
+.channel-email{--channel-tint:#FFD0B8;--channel-block:#E78F6E}
+.channel-applications{--channel-tint:#BEE8E0;--channel-block:#39A092}
+.channel-companies{--channel-tint:#DFF0A8;--channel-block:#78985A}
+.channel-symbol{width:80px;height:80px;border-radius:22px;display:grid;place-items:center;flex:none;
+ background:var(--channel-block);color:#FFF;font:700 30px var(--display);box-shadow:0 10px 25px rgba(40,29,89,.12);
+ transform:rotate(-6deg);position:relative}
+.channel-symbol span{position:absolute;top:-9px;right:-10px;color:var(--lime);font:700 21px var(--display)}
+.channel-copy{min-width:0;position:relative;z-index:1}
+.channel-copy .section-eyebrow{margin-bottom:7px}
+.channel-copy h2{font:700 clamp(22px,3vw,30px)/1.16 var(--display);margin:0;letter-spacing:-.05em}
+.channel-copy h2 span{color:var(--accent)}
+.channel-copy p{font-size:12px;color:var(--muted);margin:6px 0 0}
+.channel-action{margin-left:auto;position:relative;z-index:1;background:var(--ink);color:var(--surface);border-color:transparent;white-space:nowrap}
+.channel-action span{margin-left:10px}
+.channel-action:hover{background:var(--accent);color:var(--accent-ink)}
+/* data-dense components, designed for scanning lots of prospects */
+.panel-box,.fun,.tablewrap,.ilist{border-radius:15px}
+.fun{padding:21px}
+.fun .fhead b{font:700 31px var(--display)}
+.fun .fhead{padding-bottom:13px;margin-bottom:9px}
+.fun .row{grid-template-columns:103px 1fr 62px;gap:13px}
+.fun .lab{font-size:12px;font-weight:600}
+.fun .track .bar{border-radius:6px;background-image:none}
+.fun .track .val{font-weight:600}
+.cat{border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);background:var(--surface);transition:box-shadow .2s}
+.cat[open]{box-shadow:0 10px 31px rgba(47,35,95,.075)}
+.cat>summary{padding:14px 18px;gap:12px;align-items:center}
+.cat>summary:hover{background:color-mix(in srgb,var(--ring) 40%,var(--surface))}
+.cat>summary::before{width:8px;height:8px}
+.cat .cl{font:700 13px var(--display)}
+.cat b{background:var(--soft);border-radius:8px;min-width:28px;text-align:center;padding:3px 8px;font:600 12px var(--mono)}
+.cat[open] b{background:var(--ring);color:var(--accent)}
+.cat .cs{font-size:11px}
+.it summary{padding-top:12px;padding-bottom:12px}
+.it summary:hover{background:color-mix(in srgb,var(--ring) 48%,var(--surface))}
+.it summary strong{font-weight:700}
+.it .body{padding:15px 18px 17px}
+.it .split{gap:18px}
+.draft{border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--ring) 16%,var(--surface));padding:13px 16px}
+.draft .dh b{color:var(--accent)}
+.draft pre{font-size:13px;line-height:1.75}
+.copy{border-radius:8px;padding:5px 10px;font-weight:700}
+.tri-head h2{font:700 20px var(--display)}
+.tri-note{border-radius:10px}
+.tri-sum{border-radius:10px}
+.tri-groups{gap:11px}
+.toolbar{gap:10px}
+.toolbar input[type=search]{background:var(--surface);padding:10px 13px;min-width:190px}
+.chip{background:var(--surface);border-color:var(--line);font-weight:700;transition:transform .16s,border-color .16s}
+.chip:hover{transform:translateY(-1px);border-color:var(--accent)}
+.chip[aria-pressed=true]{background:var(--ring);border-color:var(--ring);color:var(--accent)}
+table{font-size:12px}
+th{font-size:10px;letter-spacing:.06em;padding:13px 12px;color:var(--muted);background:color-mix(in srgb,var(--soft) 63%,var(--surface))}
+td{padding:11px 12px;border-color:var(--line)}
+td.who{max-width:440px}
+td.who strong{font-weight:700}
+td.who .rowbtn{margin-left:7px}
+tr:hover td{background:color-mix(in srgb,var(--ring) 27%,var(--surface))}
+.pill select{font-weight:700;border-color:transparent;background:var(--soft);border-radius:8px}
+.person-bubble{width:29px;height:29px;display:inline-flex;vertical-align:middle;justify-content:center;align-items:center;
+ border-radius:10px;font:700 10px var(--display);margin-right:10px;flex:none;letter-spacing:-.01em}
+.person-bubble.tone-0{color:#583A7F;background:#EBDBFF}
+.person-bubble.tone-1{color:#A45745;background:#FFE0D0}
+.person-bubble.tone-2{color:#25696B;background:#D3F3ED}
+.person-bubble.tone-3{color:#536440;background:#E8F6C9}
+.it summary strong .person-bubble{margin-right:9px}
+.it summary strong{display:flex;align-items:center;gap:0;min-width:0}
+.profile-hero{border-radius:22px;background:linear-gradient(125deg,#2B2652,#513E8A);color:#FFF;box-shadow:0 15px 38px rgba(45,37,100,.13);padding:31px 34px;border:0}
+.profile-hero .section-eyebrow{color:#D8F883}
+.profile-hero h2{font-size:29px;color:#FFF}
+.profile-hero .subtitle{color:#DBD6F4}
+.profile-avatar{background:var(--lime);color:#262346;border-radius:20px;width:65px;height:65px;transform:rotate(-6deg)}
+.profile-hero-right small{color:#D8D2F3}
+.profile-hero-right strong{font:700 32px var(--display)}
+.profile-panel-title h3,.doc-action-box h3{font:700 16px var(--display)}
+.doc-action-box{border-radius:16px;padding:22px}
+.doc-card{border-radius:15px;box-shadow:var(--shadow);transition:transform .2s,border-color .2s}
+.doc-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+.doc-upload-label{border-radius:13px;min-height:135px;transition:background .2s,border-color .2s}
+.doc-upload-label:hover{background:var(--ring)}
+.profile-primary .primary-icon{border-radius:11px;background:var(--ring)}
+.company-card{border-radius:16px;position:relative;overflow:hidden;gap:9px;padding:23px;box-shadow:var(--shadow)}
+.company-card::before{content:"";position:absolute;right:-32px;top:-45px;width:110px;height:110px;
+ background:var(--lavender);border-radius:50%;opacity:.25}
+.company-card:nth-child(3n+2)::before{background:var(--peach)}
+.company-card:nth-child(3n+3)::before{background:var(--mint)}
+.company-card strong{font:700 17px var(--display);letter-spacing:-.035em;position:relative}
+.company-card small{font-size:11px;position:relative}
+.company-card:hover{transform:translateY(-3px);box-shadow:0 13px 29px rgba(59,48,123,.095)}
+.btn{font-weight:700;border-radius:10px;padding:9px 13px}
+.btn.primary{box-shadow:none}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+input,select,textarea{border-radius:10px}
+.sheet .panel{border-radius:20px}
+.sheet .panel h3{font-family:var(--display)}
+/* Respect mobile workflow: calm effects, compact text, tap-sized controls. */
+@media(max-width:1100px){
+ .overview-intro{grid-template-columns:1.12fr .88fr}
+ .hero-copy{padding:36px 0 31px 35px}
+ .hero-graphic svg{width:100%}
+ .pill-top{left:0}.pill-bottom{right:0}
+ .ttab{padding:11px 12px}
+}
+@media(max-width:870px){
+ .overview-intro{grid-template-columns:1fr;min-height:0}
+ .hero-copy{padding:35px}
+ .hero-graphic{display:none}
+ .overview-intro h2{font-size:clamp(36px,7vw,51px)}
+ .channel-intro{padding:20px 22px}
+ .channel-symbol{width:65px;height:65px;border-radius:18px;font-size:25px}
+ .channel-intro::after{right:25px;opacity:.15}
+ .kpis,.kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ttab.profile-tab{margin-left:0}
+}
+@media(max-width:600px){
+ .wrap{padding-left:15px;padding-right:15px}
+ header{padding:16px 0 19px}
+ .brand-mark{width:40px;height:40px;border-radius:14px;font-size:27px}
+ h1{font-size:25px}
+ .save{padding:8px 9px;font-size:9px}
+ .theme-switch{width:34px;height:34px;border-radius:10px}
+ .header-right{margin-left:auto;gap:7px}
+ nav.top{margin-bottom:18px;gap:2px;padding:5px;top:0}
+ .ttab{padding:9px 11px;gap:5px;font-size:11px}
+ .ttab .nav-icon{font-size:13px;width:13px}
+ .overview-intro{border-radius:19px}
+ .hero-copy{padding:29px 24px}
+ .hero-eyebrow{font-size:8px}
+ .overview-intro h2{font-size:37px;margin:17px 0 11px}
+ .overview-intro p{font-size:13px}
+ .overview-actions .btn{min-height:40px;padding:9px 13px;font-size:11px}
+ .hero-social-proof{font-size:10px}
+ .kpis,.kpis.k4{gap:9px;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .kpi,.kpi+.kpi{border:1px solid var(--line);border-radius:12px;min-height:92px;padding:14px}
+ .kpi:nth-child(even){border-left:1px solid var(--line)}
+ .kpi .n{font-size:27px}
+ .kpi .l{font-size:10px}
+ .micro-header>span:last-child{display:none}
+ .src{padding:19px;border-radius:14px}
+ .channel-intro{gap:12px;border-radius:15px;padding:16px}
+ .channel-symbol{width:46px;height:46px;border-radius:13px;font-size:20px}
+ .channel-symbol span{font-size:13px}
+ .channel-copy h2{font-size:20px}
+ .channel-copy p{font-size:11px}
+ .channel-action{display:none}
+ .channel-intro::after{display:none}
+ .section-heading>span:last-child{display:none}
+ .section-title>span:last-child{font-size:19px}
+ .panel-box{padding:16px}
+ .it summary{padding:10px 11px}
+ .profile-hero{padding:19px;border-radius:16px}
+ .profile-avatar{width:49px;height:49px;border-radius:14px;font-size:20px}
+ .profile-hero h2{font-size:22px}
+ .profile-side{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+ .hero-graphic svg{animation:none}
+ .src,.kpi,.company-card,.chip,.theme-switch,.doc-card{transition:none!important}
+}
+
 </style>
 
 <div class="wrap">
   <header>
     <div class="brand-lockup">
-      <div class="brand-mark" aria-hidden="true">R</div>
+      <div class="brand-mark" aria-hidden="true"><span>p</span><span class="brand-spark">✳</span></div>
       <div>
-        <div class="eyebrow">RECRUITING WORKSPACE <span class="eyebrow-dot">/</span> 2027 CYCLE</div>
+        <div class="eyebrow">YOUR OUTREACH STUDIO <span class="eyebrow-dot">✳</span> 2027</div>
         <h1>Pipeline<span class="brand-period">.</span></h1>
       </div>
     </div>
     <div class="header-right">
-      <span class="header-cycle">LONDON <span>↔</span> OSLO</span>
-      <button class="btn header-add" data-add="applications" type="button">+ New application</button>
+      <span class="header-cycle">MAKE CONNECTIONS <span>✳</span> BUILD MOMENTUM</span>
+      <button class="btn header-add" data-add="linkedin" type="button">+ Add contact</button>
+      <button class="theme-switch" type="button" id="theme-toggle" title="Toggle light or dark appearance" aria-label="Toggle light or dark appearance"><span id="theme-symbol">◐</span></button>
       <div class="save" id="save" role="status" aria-live="polite"><b>●</b> Connecting…</div>
     </div>
   </header>
 
   <nav class="top" role="tablist" aria-label="Sections">
-    <button class="ttab" role="tab" data-view="overview">Overview</button>
-    <button class="ttab" role="tab" data-view="linkedin">LinkedIn<span id="c-li"></span></button>
-    <button class="ttab" role="tab" data-view="email">Email<span id="c-em"></span></button>
-    <button class="ttab" role="tab" data-view="applications">Applications<span id="c-ap"></span></button>
-    <button class="ttab" role="tab" data-view="companies">Companies</button>
-    <button class="ttab profile-tab" role="tab" data-view="profile">Profile &amp; Docs</button>
+    <button class="ttab" role="tab" data-view="overview"><span class="nav-icon" aria-hidden="true">◈</span> Overview</button>
+    <button class="ttab" role="tab" data-view="linkedin"><span class="nav-icon" aria-hidden="true">↗</span> LinkedIn<span id="c-li"></span></button>
+    <button class="ttab" role="tab" data-view="email"><span class="nav-icon" aria-hidden="true">@</span> Email<span id="c-em"></span></button>
+    <button class="ttab" role="tab" data-view="applications"><span class="nav-icon" aria-hidden="true">▦</span> Applications<span id="c-ap"></span></button>
+    <button class="ttab" role="tab" data-view="companies"><span class="nav-icon" aria-hidden="true">◇</span> Companies</button>
+    <button class="ttab profile-tab" role="tab" data-view="profile"><span class="nav-icon" aria-hidden="true">✦</span> Profile &amp; Docs</button>
   </nav>
 
   <!-- OVERVIEW -->
   <section class="view" id="v-overview">
+
     <div class="overview-intro">
-      <div>
-        <span class="section-eyebrow">YOUR WORKSPACE · 2027</span>
-        <h2>Stay ahead of the process<span>.</span></h2>
-        <p>Every application, conversation and next step in one place.</p>
+      <div class="hero-copy">
+        <span class="hero-eyebrow"><span class="hero-live" aria-hidden="true"></span> YOUR NETWORK, YOUR NEXT OPPORTUNITY</span>
+        <h2>Good things start<br>with a <em>hello<span class="hero-period">.</span></em></h2>
+        <p>Meet the right people. Start better conversations. Keep the momentum going.</p>
+        <div class="overview-actions">
+          <button class="btn hero-primary" data-go="linkedin" type="button">Explore people <span aria-hidden="true">↗</span></button>
+          <button class="btn hero-secondary" data-go="email" type="button">Email outreach <span aria-hidden="true">→</span></button>
+        </div>
+        <div class="hero-social-proof"><div class="hero-mini-avatars" aria-hidden="true"><span>↗</span><span>@</span><span>✦</span></div>
+          <span><strong id="hero-contacts">0</strong> connections tracked <i>·</i> <strong id="hero-conversations">0</strong> replies received</span></div>
       </div>
-      <div class="overview-actions">
-        <button class="btn primary" data-add="applications" type="button">+ Add application</button>
-        <button class="btn" data-view="profile" type="button">Your documents ↗</button>
+      <div class="hero-graphic" aria-hidden="true">
+        <div class="hero-art-grid"></div>
+        <svg viewBox="0 0 460 360" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+          <circle cx="225" cy="184" r="145" stroke="#FFFFFF" stroke-opacity=".11" stroke-width="1" stroke-dasharray="4 8"/>
+          <circle cx="225" cy="184" r="96" stroke="#FFFFFF" stroke-opacity=".15" stroke-width="1"/>
+          <circle cx="225" cy="184" r="49" stroke="#D4FA80" stroke-opacity=".5" stroke-width="1"/>
+          <path d="M225 184 L100 93 L68 193 M225 184 L340 100 L384 208 M225 184 L118 295 M225 184 L342 289" stroke="#C3B3FF" stroke-opacity=".43" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 7"/>
+          <path d="M118 295 Q204 320 342 289 M100 93 Q240 11 340 100" stroke="#D8E7FC" stroke-opacity=".18" stroke-width="1.5"/>
+          <circle cx="225" cy="184" r="49" fill="#D8FD84"/>
+          <path d="M203 184 L216 197 L248 167" stroke="#242444" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="100" cy="93" r="30" fill="#BBA8FF"/>
+          <text x="100" y="100" text-anchor="middle" fill="#26224D" font-family="Arial,sans-serif" font-size="20" font-weight="700">in</text>
+          <circle cx="340" cy="100" r="30" fill="#FFAB96"/>
+          <text x="340" y="107" text-anchor="middle" fill="#422331" font-family="Arial,sans-serif" font-size="24" font-weight="700">@</text>
+          <circle cx="68" cy="193" r="20" fill="#96E9E0"/>
+          <text x="68" y="201" text-anchor="middle" fill="#174147" font-family="Arial,sans-serif" font-size="19">✳</text>
+          <circle cx="384" cy="208" r="23" fill="#E7C6FC"/>
+          <text x="384" y="215" text-anchor="middle" fill="#3B2855" font-family="Arial,sans-serif" font-size="19">✦</text>
+          <circle cx="118" cy="295" r="24" fill="#E7E8FF"/>
+          <text x="118" y="302" text-anchor="middle" fill="#38365E" font-family="Arial,sans-serif" font-size="18" font-weight="700">BI</text>
+          <circle cx="342" cy="289" r="24" fill="#F8DDAC"/>
+          <text x="342" y="296" text-anchor="middle" fill="#584025" font-family="Arial,sans-serif" font-size="16" font-weight="700">IC</text>
+          <circle cx="137" cy="52" r="4" fill="#D8FD84"/><circle cx="390" cy="70" r="4" fill="#FFAB96"/>
+          <path d="M400 290 L400 305 M392 297.5 L408 297.5" stroke="#D8FD84" stroke-width="3" stroke-linecap="round"/>
+          <path d="M37 67 L37 77 M32 72 L42 72" stroke="#BBA8FF" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div class="hero-floating-pill pill-top"><span class="pulse-dot"></span> Keep in touch</div>
+        <div class="hero-floating-pill pill-bottom">✦ Every conversation counts</div>
       </div>
     </div>
     <div class="kpis">
@@ -541,9 +887,10 @@ tr:hover td{background:color-mix(in srgb,var(--soft) 38%,var(--surface))}
       <div class="kpi"><span class="n" id="k-live">0</span><span class="l">Live (applied → interview)</span></div>
       <div class="kpi"><span class="n" id="k-offer">0</span><span class="l">Offers</span></div>
     </div>
+    <div class="micro-header"><span class="section-eyebrow">YOUR CHANNELS</span><span>Every conversation is a door worth opening <span aria-hidden="true">↘</span></span></div>
     <div class="sources" id="sources"></div>
     <div>
-      <h2 class="sec">Today <span>Deadlines first, then replies, thank-yous, follow-ups and new people</span></h2>
+      <h2 class="sec section-heading"><span class="section-title"><span class="section-symbol symbol-lime">✳</span><span>On your radar <small>THE NEXT MOVES</small></span></span><span>Replies, follow-ups and fresh opportunities</span></h2>
       <div class="stack" id="today"></div>
     </div>
     <div class="funnels">
@@ -555,6 +902,12 @@ tr:hover td{background:color-mix(in srgb,var(--soft) 38%,var(--surface))}
 
   <!-- LINKEDIN -->
   <section class="view" id="v-linkedin" hidden>
+    <div class="channel-intro channel-linkedin">
+      <div class="channel-symbol" aria-hidden="true">in<span>✳</span></div>
+      <div class="channel-copy"><span class="section-eyebrow">MAKE THE INTRODUCTION</span><h2>Make connections that matter<span>.</span></h2>
+      <p>Your LinkedIn pipeline, conversations and people to reach next.</p></div>
+      <button class="btn channel-action" data-add="linkedin" type="button">+ Add person <span aria-hidden="true">↗</span></button>
+    </div>
     <div class="kpis k4">
       <div class="kpi"><span class="n" id="li-n">0</span><span class="l">LinkedIn outreach</span></div>
       <div class="kpi"><span class="n" id="li-r">–</span><span class="l">Reply rate</span></div>
@@ -572,6 +925,12 @@ tr:hover td{background:color-mix(in srgb,var(--soft) 38%,var(--surface))}
 
   <!-- EMAIL -->
   <section class="view" id="v-email" hidden>
+    <div class="channel-intro channel-email">
+      <div class="channel-symbol" aria-hidden="true">@<span>✦</span></div>
+      <div class="channel-copy"><span class="section-eyebrow">A NOTE CAN OPEN A DOOR</span><h2>Start a great conversation<span>.</span></h2>
+      <p>Find an address, send a thoughtful message and stay on top of replies.</p></div>
+      <button class="btn channel-action" data-add="email" type="button">+ Add person <span aria-hidden="true">↗</span></button>
+    </div>
     <div class="kpis k4">
       <div class="kpi"><span class="n" id="em-n">0</span><span class="l">Emails sent</span></div>
       <div class="kpi"><span class="n" id="em-r">–</span><span class="l">Reply rate</span></div>
@@ -589,6 +948,12 @@ tr:hover td{background:color-mix(in srgb,var(--soft) 38%,var(--surface))}
 
   <!-- APPLICATIONS -->
   <section class="view" id="v-applications" hidden>
+    <div class="channel-intro channel-applications">
+      <div class="channel-symbol" aria-hidden="true">▦<span>✶</span></div>
+      <div class="channel-copy"><span class="section-eyebrow">KEEP YOUR OPTIONS OPEN</span><h2>All opportunities, one place<span>.</span></h2>
+      <p>Track your applications without losing sight of the people behind them.</p></div>
+      <button class="btn channel-action" data-add="applications" type="button">+ New application <span aria-hidden="true">↗</span></button>
+    </div>
     <div class="kpis k4">
       <div class="kpi"><span class="n" id="ap-n">0</span><span class="l">Applications</span></div>
       <div class="kpi"><span class="n" id="ap-l">0</span><span class="l">Live</span></div>
@@ -612,7 +977,11 @@ tr:hover td{background:color-mix(in srgb,var(--soft) 38%,var(--surface))}
   </section>
   <!-- COMPANIES -->
   <section class="view" id="v-companies" hidden>
-    <div class="tri-head"><div><h2>Company profiles</h2><p class="tri-meta">Applications, LinkedIn, email contacts and prospects in one place. Add aliases to join different company names.</p></div></div>
+    <div class="channel-intro channel-companies">
+      <div class="channel-symbol" aria-hidden="true">◇<span>✦</span></div>
+      <div class="channel-copy"><span class="section-eyebrow">KNOW THE PEOPLE, KNOW THE PLACE</span><h2>One company. Every connection<span>.</span></h2>
+      <p>Bring your conversations and contact research together.</p></div>
+    </div>
     <div id="companies-root" class="stack"></div>
   </section>
 
@@ -734,6 +1103,9 @@ let view = "overview", db = null, mcp = null, editing = null;
 const ui = {linkedin:{filter:null,q:""}, email:{filter:null,q:""}, applications:{filter:null,q:"",type:null}};
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const personInitials = n => String(n||"?").trim().split(/\s+/).slice(0,2).map(x=>x[0]?.toUpperCase()||"").join("");
+const personHue = n => {let h=0;for(const c of String(n||""))h=(h*31+c.charCodeAt(0))%4;return "tone-"+h;};
+const personAvatar = n => `<span class="person-bubble ${personHue(n)}" aria-hidden="true">${esc(personInitials(n))}</span>`;
 const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
 const days = iso => iso ? Math.round((today() - new Date(iso + "T00:00:00")) / 864e5) : null;
 const fmt = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"}) : "";
@@ -1228,6 +1600,26 @@ document.addEventListener("click",async e=>{
     catch(e){note.textContent="Clipboard unavailable in this browser.";}
   }
 });
+
+/* Appearance preference is local to this browser and does not touch outreach data. */
+function setStudioTheme(mode){
+  const root=document.documentElement;
+  root.dataset.theme=mode;
+  const button=document.getElementById("theme-toggle"),symbol=document.getElementById("theme-symbol");
+  const isDark=mode==="dark";
+  if(symbol)symbol.textContent=isDark?"☀":"☾";
+  if(button)button.setAttribute("aria-label",isDark?"Switch to light appearance":"Switch to dark appearance");
+}
+try{
+  const savedTheme=localStorage.getItem("pipeline-studio-theme");
+  setStudioTheme(savedTheme==="dark"||savedTheme==="light"?savedTheme:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+}catch(err){setStudioTheme("light");}
+document.getElementById("theme-toggle")?.addEventListener("click",()=>{
+ const next=document.documentElement.dataset.theme==="dark"?"light":"dark";
+ setStudioTheme(next);
+ try{localStorage.setItem("pipeline-studio-theme",next)}catch(e){}
+});
+
 /* ---------- funnels ---------- */
 const AP_RANK = {"Applied":1,"Online test":2,"HireVue":3,"Interview":4,"Offer":5};
 const apRank = r => r.status === "Rejected" || r.status === "Withdrawn" ? (AP_RANK[r.rejectedAt] || 1) : (AP_RANK[r.status] || 0);
@@ -1282,18 +1674,20 @@ function renderOverview(){
   const O = state.outreach, A = state.applications, LI = ofCh("LinkedIn"), EM = ofCh("Email");
   const triItems = [...(tri.li.data?.items || []).map(i => ({...i, ch:"LinkedIn"})), ...(tri.em.data?.items || []).map(i => ({...i, ch:"Email"}))];
   $("k-out").textContent = O.length; $("k-reply").textContent = rate(O);
+  $("hero-contacts").textContent = O.length;
+  $("hero-conversations").textContent = O.filter(r=>replied.has(r.status)).length;
   $("k-app").textContent = A.length; $("k-live").textContent = A.filter(r => live.has(r.status)).length; $("k-offer").textContent = A.filter(r => r.status === "Offer").length;
   const owe = triItems.filter(i => i.ch === "LinkedIn" && (i.bucket === "reply" || i.bucket === "thank")).length;
   $("sources").innerHTML = `
-    <button class="src" data-go="linkedin"><div class="h"><strong>LinkedIn</strong><span>Open →</span></div>
+    <button class="src src-linkedin" data-go="linkedin"><div class="h"><span class="src-label"><i class="src-symbol">in</i><strong>LinkedIn</strong></span><span>Explore ↗</span></div>
       <div class="big">${LI.length}<small>people messaged</small></div>
       <dl><dt>Reply rate</dt><dd>${rate(LI)}</dd><dt>Calls booked or done</dt><dd>${LI.filter(r => met.has(r.status)).length}</dd>
       <dt>Replies / thanks owed</dt><dd class="${owe ? "warn" : ""}">${triage ? owe : "–"}</dd><dt>Need a follow-up</dt><dd class="${LI.filter(overdue).length ? "warn" : ""}">${LI.filter(overdue).length}</dd></dl></button>
-    <button class="src" data-go="email"><div class="h"><strong>Email</strong><span>Open →</span></div>
+    <button class="src src-email" data-go="email"><div class="h"><span class="src-label"><i class="src-symbol">@</i><strong>Email</strong></span><span>Explore ↗</span></div>
       <div class="big">${EM.length}<small>emails sent</small></div>
       <dl><dt>Reply rate</dt><dd>${rate(EM)}</dd><dt>Calls booked or done</dt><dd>${EM.filter(r => met.has(r.status)).length}</dd>
       <dt>Need a follow-up</dt><dd class="${EM.filter(overdue).length ? "warn" : ""}">${EM.filter(overdue).length}</dd></dl></button>
-    <button class="src" data-go="applications"><div class="h"><strong>Applications</strong><span>Open →</span></div>
+    <button class="src src-applications" data-go="applications"><div class="h"><span class="src-label"><i class="src-symbol">▦</i><strong>Applications</strong></span><span>Explore ↗</span></div>
       <div class="big">${A.length}<small>tracked</small></div>
       <dl><dt>Live</dt><dd>${A.filter(r => live.has(r.status)).length}</dd><dt>Preparing</dt><dd>${A.filter(r => r.status === "Preparing").length}</dd>
       <dt>Offers</dt><dd>${A.filter(r => r.status === "Offer").length}</dd><dt>Rejected</dt><dd>${A.filter(r => r.status === "Rejected").length}</dd></dl></button>`;
@@ -1434,7 +1828,7 @@ function renderTable(v){
   } else {
     head.innerHTML = `<tr><th>Person</th><th>${v === "email" ? "Address" : "Referred by"}</th><th>Status</th><th>Sent</th><th>Waiting</th><th>Notes</th><th></th></tr>`;
     body.innerHTML = rows.length ? rows.map(r => { const d = r.status === "Sent" ? days(r.sent) : null; return `<tr>
-      <td class="who"><strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))}</small><button class="rowbtn" data-company="${esc(companyKey(r.firm))}">Firm ↗</button>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
+      <td class="who">${personAvatar(r.name)}<strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))}</small><button class="rowbtn" data-company="${esc(companyKey(r.firm))}">Firm ↗</button>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
       <td>${v === "email" ? (r.address ? `<span style="font-family:var(--mono);font-size:12px">${esc(r.address)}</span>` : dash) : (r.via ? esc(r.via) : dash)}</td>
       <td>${pill(r)}</td><td class="num">${fmt(r.sent) || dash}</td>
       <td class="num ${d >= 7 ? "overdue" : ""}">${d != null ? d + "d" : dash}</td>
@@ -1680,14 +2074,14 @@ function renderProspects(){
   const open = prospects.filter(p => (p.status || "New") === "New").sort((a,b) => String(b.foundAt||"").localeCompare(String(a.foundAt||"")));
   const openLi = open.filter(p => !p.emailOnly);
   $("pros-li").innerHTML = openLi.length ? openLi.map(p => item("p:" + p.id,
-      `<strong>${esc(p.name)}${p.connected ? '<span class="tag">Connected</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
+      `<strong>${personAvatar(p.name)}${esc(p.name)}${p.connected ? '<span class="tag">Connected</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
       split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${emailLine(p)}
        <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
   $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New"), "li");
   const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
-      `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
+      `<strong>${personAvatar(p.name)}${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
       split(`${emailLine(p)}
        <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject, p.kind === "p" && p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and rates each guess high, medium or low.</p>`;
