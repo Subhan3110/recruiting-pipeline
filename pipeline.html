@@ -831,7 +831,6 @@ input,select,textarea{border-radius:10px}
     <button class="ttab" role="tab" data-view="linkedin"><span class="nav-icon" aria-hidden="true">↗</span> LinkedIn<span id="c-li"></span></button>
     <button class="ttab" role="tab" data-view="email"><span class="nav-icon" aria-hidden="true">@</span> Email<span id="c-em"></span></button>
     <button class="ttab" role="tab" data-view="applications"><span class="nav-icon" aria-hidden="true">▦</span> Applications<span id="c-ap"></span></button>
-    <button class="ttab" role="tab" data-view="companies"><span class="nav-icon" aria-hidden="true">◇</span> Companies</button>
     <button class="ttab profile-tab" role="tab" data-view="profile"><span class="nav-icon" aria-hidden="true">✦</span> Profile &amp; Docs</button>
   </nav>
 
@@ -975,16 +974,6 @@ input,select,textarea{border-radius:10px}
     <div style="display:grid;gap:14px" data-tri="ap"></div>
     <div style="display:grid;gap:12px" data-table="applications"></div>
   </section>
-  <!-- COMPANIES -->
-  <section class="view" id="v-companies" hidden>
-    <div class="channel-intro channel-companies">
-      <div class="channel-symbol" aria-hidden="true">◇<span>✦</span></div>
-      <div class="channel-copy"><span class="section-eyebrow">KNOW THE PEOPLE, KNOW THE PLACE</span><h2>One company. Every connection<span>.</span></h2>
-      <p>Bring your conversations and contact research together.</p></div>
-    </div>
-    <div id="companies-root" class="stack"></div>
-  </section>
-
   <!-- PROFILE AND DOCUMENTS -->
   <section class="view" id="v-profile" hidden>
     <div class="profile-hero">
@@ -1096,7 +1085,7 @@ const live = new Set(["Applied","Online test","HireVue","Interview"]);
 const replied = new Set(["Replied","Call booked","Call done","Declined"]);
 const contacted = new Set(["Sent","Replied","Call booked","Call done","No reply","Declined"]);
 const met = new Set(["Call booked","Call done"]);
-const VIEWS = ["overview","linkedin","email","applications","companies","profile"];
+const VIEWS = ["overview","linkedin","email","applications","profile"];
 
 let state = {applications:[], outreach:[]};
 let view = "overview", db = null, mcp = null, editing = null;
@@ -1138,7 +1127,7 @@ function setSave(ok, text){ const el = $("save"); el.className = "save" + (ok ? 
 
 
 /* ---------- company profiles: canonical firms and shared records ---------- */
-let companyProfiles = [], activeCompany = null, companyQuery = "";
+let companyProfiles = [];
 function companyKey(name){
   const key = norm(name);
   if (!key) return "";
@@ -1146,87 +1135,6 @@ function companyKey(name){
     (Array.isArray(p.aliases) ? p.aliases : String(p.aliases || "").split(",")).some(a => norm(a) === key));
   return profile ? profile.id : key;
 }
-function companyGroups(){
-  const groups = new Map();
-  const add = (name, type, value) => {
-    const id = companyKey(name); if (!id) return;
-    if (!groups.has(id)) groups.set(id, {id, names:new Set(), applications:[], outreach:[], prospects:[], profile:null});
-    const g = groups.get(id); if (name) g.names.add(name);
-    if (type) g[type].push(value);
-  };
-  companyProfiles.forEach(p => { add(p.name || p.id); const g = groups.get(p.id); if(g) g.profile = p; });
-  state.applications.forEach(a => add(a.company, "applications", a));
-  state.outreach.forEach(o => add(o.firm, "outreach", o));
-  prospects.forEach(p => add(p.firm, "prospects", p));
-  return [...groups.values()].map(g => ({
-    ...g, name:g.profile?.name || [...g.names].sort((a,b)=>a.length-b.length)[0] || g.id,
-    aliases:g.profile?.aliases || [],
-    notes:g.profile?.notes || ""
-  })).sort((a,b)=>a.name.localeCompare(b.name));
-}
-function renderCompanies(){
-  const root = $("companies-root"); if (!root) return;
-  const groups = companyGroups();
-  const selected = activeCompany ? groups.find(g => g.id === activeCompany) : null;
-  if (!selected){
-    const filtered = groups.filter(g => !companyQuery || [g.name,...g.names].join(" ").toLowerCase().includes(companyQuery.toLowerCase()));
-    root.innerHTML = `<div class="toolbar"><input id="q-companies" type="search" placeholder="Search companies" value="${esc(companyQuery)}" aria-label="Search companies"><span class="tri-meta">${filtered.length} companies</span></div>
-      <div class="company-grid">${filtered.length ? filtered.map(g => `<button class="company-card" data-company="${esc(g.id)}">
-        <strong>${esc(g.name)}</strong><small>${g.applications.length} application(s) · ${g.outreach.length} contact(s) · ${g.prospects.length} prospect(s)</small>
-        <small>${esc(g.notes.slice(0,100) || "Open company profile →")}</small></button>`).join("") : '<p class="empty-note">No firms found.</p>'}</div>`;
-    return;
-  }
-  const apps = selected.applications.map(a => `<div class="company-line"><strong>${esc(a.role || "Application")}</strong>
-    <small>${esc(a.status || "Preparing")} · ${esc(a.location || "")}${a.deadline ? " · deadline " + esc(fmt(a.deadline)) : ""}</small>
-    <div><button class="rowbtn" data-company-app="${esc(a.id)}">Edit application</button></div></div>`).join("") || '<p class="empty-note">No applications.</p>';
-  const people = selected.outreach.map(o => `<div class="company-line"><strong>${esc(o.name)}</strong>
-    <small>${esc(o.title || "")} · ${esc(o.channel || "LinkedIn")} · ${esc(o.status || "")}</small>
-    <div><button class="rowbtn" data-company-contact="${esc(o.id)}" data-contact-channel="${esc(o.channel || "LinkedIn")}">Edit contact</button></div></div>`).join("") || '<p class="empty-note">No contacts yet.</p>';
-  const prospectsList = selected.prospects.filter(p => (p.status || "New") === "New").map(p =>
-    `<div class="company-line"><strong>${esc(p.name)}</strong><small>${esc(p.title || "")} · Prospect</small></div>`).join("");
-  root.innerHTML = `<div class="company-profile">
-    <div class="toolbar"><button class="btn" data-company-back>← All companies</button><h2>${esc(selected.name)}</h2></div>
-    <div class="kpis k4"><div class="kpi"><span class="n">${selected.applications.length}</span><span class="l">Applications</span></div>
-      <div class="kpi"><span class="n">${selected.outreach.length}</span><span class="l">Contacts</span></div>
-      <div class="kpi"><span class="n">${selected.outreach.filter(x=>replied.has(x.status)).length}</span><span class="l">Replies</span></div>
-      <div class="kpi"><span class="n">${selected.prospects.length}</span><span class="l">Prospects</span></div></div>
-    <div class="company-columns">
-      <div class="panel-box"><h2 class="sec">Applications</h2>${apps}</div>
-      <div class="panel-box"><h2 class="sec">Networking</h2>${people}${prospectsList ? `<h2 class="sec">Potential contacts</h2>${prospectsList}` : ""}</div>
-    </div>
-    <form id="company-form" class="company-form panel-box" data-company-id="${esc(selected.id)}">
-      <h2 class="sec">Company notes and aliases</h2>
-      <label>Company name<input name="name" required value="${esc(selected.name)}" maxlength="150"></label>
-      <label>Other names (comma separated)<input name="aliases" value="${esc(Array.isArray(selected.aliases)? selected.aliases.join(", ") : selected.aliases)}" placeholder="e.g. JP Morgan, JPMorgan Chase"></label>
-      <label>Research / conversations / next steps<textarea name="notes" rows="5" placeholder="What do you know about this firm?">${esc(selected.notes)}</textarea></label>
-      <div class="acts"><button type="submit" class="btn primary">Save company profile</button><span class="tri-meta" id="company-save-note"></span></div>
-    </form></div>`;
-}
-document.addEventListener("click", e => {
-  const b = e.target.closest("button"); if(!b) return;
-  if (b.hasAttribute("data-company-back")){ activeCompany=null; render(); }
-  else if(b.dataset.companyApp){ show("applications"); openForm("applications",b.dataset.companyApp); }
-  else if(b.dataset.companyContact){ const channel=b.dataset.contactChannel==="Email"?"email":"linkedin"; show(channel);openForm(channel,b.dataset.companyContact); }
-});
-document.addEventListener("input", e => {
-  if(e.target.id==="q-companies"){ companyQuery=e.target.value; renderCompanies(); const input=$("q-companies"); input?.focus(); input?.setSelectionRange(companyQuery.length,companyQuery.length); }
-});
-document.addEventListener("submit",async e => {
-  if(e.target.id!=="company-form") return;
-  e.preventDefault();
-  const form=e.target, id=form.dataset.companyId, fd=new FormData(form);
-  const name=String(fd.get("name")||"").trim();
-  if(!name) return;
-  const aliases=String(fd.get("aliases")||"").split(",").map(s=>s.trim()).filter(Boolean);
-  const duplicate = aliases.some(a => companyProfiles.some(p => p.id!==id && (norm(p.name)===norm(a) || (p.aliases||[]).some(x => norm(x)===norm(a)))));
-  if(duplicate){ $("company-save-note").textContent="An alias already belongs to another company.";return; }
-  const data={name, aliases, notes:String(fd.get("notes")||""), updatedAt:new Date().toISOString()};
-  if(db){ try{await db.collection("companies").doc(id).set(data);$("company-save-note").textContent="Saved.";}
-    catch(err){setSave(false,"Could not save company");$("company-save-note").textContent="Save failed.";return;} }
-  const prior=companyProfiles.find(x=>x.id===id);
-  if(prior) Object.assign(prior,data); else companyProfiles.push({id,...data});
-  render();
-});
 /* ---------- AI-neutral status proposals and review queue ---------- */
 let statusSuggestions = [];
 const updateStatuses = new Set(STAT.applications.map(([s])=>s));
@@ -1791,7 +1699,7 @@ function renderApps(){
     .sort((a,b) => String(b.applied || "").localeCompare(String(a.applied || "")));
   const pill = r => `<span class="pill" style="--c:var(${color("applications", r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="applications">${STAT.applications.map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
   const dash = '<span class="blank">–</span>';
-  const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><button class="rowbtn" data-company="${esc(companyKey(r.company))}">${esc(r.company)}</button><small>${esc(r.role || "")}</small>${mailBtn(r)}</td>
+  const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><strong>${esc(r.company)}</strong><small>${esc(r.role || "")}</small>${mailBtn(r)}</td>
     <td><span class="tag">${typeOf(r)}</span>${c.length ? `<span class="tag warm" title="${esc(c.map(o => o.name + " (" + o.status + ")").join(", "))}">${c.length} contact${c.length > 1 ? "s" : ""}</span>` : ""}</td>
     <td>${esc(r.location || "")}</td><td>${pill(r)}</td><td class="num">${fmt(r.applied) || dash}</td>
     <td class="num ${r.deadline && -days(r.deadline) <= 3 && -days(r.deadline) >= 0 ? "overdue" : ""}">${fmt(r.deadline) || dash}</td>
@@ -1828,7 +1736,7 @@ function renderTable(v){
   } else {
     head.innerHTML = `<tr><th>Person</th><th>${v === "email" ? "Address" : "Referred by"}</th><th>Status</th><th>Sent</th><th>Waiting</th><th>Notes</th><th></th></tr>`;
     body.innerHTML = rows.length ? rows.map(r => { const d = r.status === "Sent" ? days(r.sent) : null; return `<tr>
-      <td class="who">${personAvatar(r.name)}<strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))}</small><button class="rowbtn" data-company="${esc(companyKey(r.firm))}">Firm ↗</button>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
+      <td class="who">${personAvatar(r.name)}<strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))}</small>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
       <td>${v === "email" ? (r.address ? `<span style="font-family:var(--mono);font-size:12px">${esc(r.address)}</span>` : dash) : (r.via ? esc(r.via) : dash)}</td>
       <td>${pill(r)}</td><td class="num">${fmt(r.sent) || dash}</td>
       <td class="num ${d >= 7 ? "overdue" : ""}">${d != null ? d + "d" : dash}</td>
@@ -1840,7 +1748,6 @@ function render(){
   drafts.clear();
   renderStats();
   if (view === "overview") renderOverview();
-  else if (view === "companies") renderCompanies();
   else if (view === "profile") renderProfile();
   else renderTable(view);
   if (view === "applications"){ appFunnel("fn-ap"); renderTriage("ap"); renderSuggestionReview(); }
@@ -1888,7 +1795,6 @@ document.addEventListener("click", e => {
   const t = e.target.closest("button"); if (!t) return;
   if (t.dataset.view) show(t.dataset.view);
   else if (t.dataset.go) show(t.dataset.go);
-   else if (t.dataset.company) { activeCompany = t.dataset.company; show("companies"); }
   else if (t.dataset.f !== undefined && t.dataset.v){ ui[t.dataset.v].filter = t.dataset.f || null; render(); }
   else if (t.dataset.edit) openForm(t.dataset.v, t.dataset.edit);
   else if (t.dataset.add) openForm(t.dataset.add, null);
