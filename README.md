@@ -63,9 +63,9 @@ The Artifact listens to Claude DB collection `application_suggestions`. An exter
 
 **Important:** The existing `Check applications` trigger and its external Claude workflow were **not modified** by this repo change. To achieve end-to-end email → review queue, update that external workflow to write suggestions instead of directly mutating applications. The UI doesn't gain access to Gmail merely from this commit. Third-party AI systems cannot write to the Claude Artifact DB directly without an authorised bridge; use the manual JSON import until one is built.
 
-### Company profiles
+### Historical company matching (no Companies page)
 
-The **Companies** tab derives a combined view from existing `applications`, `outreach` and `prospects` records, preserving the current data. Additional notes and alias names are saved in Claude DB collection `companies`, keyed by canonical company ID. Use alternate names/aliases to merge real naming variations, and check existing firms before adding an alias. Exact normalised matching replaces the old permissive prefix match to reduce accidental company merges.
+The removed **Companies** tab previously derived a combined view from existing `applications`, `outreach` and `prospects` records, preserving the current data. Additional notes and alias names are saved in Claude DB collection `companies`, keyed by canonical company ID. Use alternate names/aliases to merge real naming variations, and check existing firms before adding an alias. Exact normalised matching replaces the old permissive prefix match to reduce accidental company merges.
 
 ### Deployment and checks
 
@@ -73,7 +73,7 @@ The JavaScript was checked for parse errors when committed. Browser/Artifact per
 
 ## Visual redesign and Profile & Docs
 
-The interface now uses a compact editorial-finance visual system (Manrope headings, restrained blue emphasis, a sticky segmented navigation, improved KPI/cards/tables, accessible keyboard focus states and responsive mobile layouts). Existing Overview, LinkedIn, Email, Applications and Companies functionality is retained.
+The interface now uses a compact editorial-finance visual system (Manrope headings, restrained blue emphasis, a sticky segmented navigation, improved KPI/cards/tables, accessible keyboard focus states and responsive mobile layouts). Existing Overview, LinkedIn, Email and Applications functionality is retained; the Companies page was subsequently removed.
 
 The new **Profile & Docs** tab has:
 
@@ -85,3 +85,12 @@ The new **Profile & Docs** tab has:
 **Privacy and safety:** Do not add identity documents, passport scans, bank information, private academic records, or other highly sensitive material as public links. Cloud links retain the permission rules of their original hosting service. Review recipients and access rights before sharing links. Local browser storage may be unavailable or cleared by the browser / embedded Artifact sandbox. The app checks for storage support and shows an error if it cannot persist uploads. External URLs are restricted to HTTPS and open with `rel="noopener noreferrer"`.
 
 **Deployment:** Only `pipeline.html` and `README.md` are stored on GitHub. Uploads and personal profile data are **not** committed to this repository. Publishing the new version within the existing Claude Artifact is still a separate step and needs live testing of Claude DB permissions and browser file storage.
+
+## Outreach focus: country on recommended people
+
+- The **Companies page has been removed** from navigation and the UI. Its previously stored data is **not deleted**. The existing company alias data is still read internally so application/contact matching remains compatible.
+- Recommended contacts in **Overview → New people**, **LinkedIn → People to reach out to**, **Email → Email finder**, and their contacted/skipped lists now always display a working-country badge. Existing contacted outreach records also show country where known.
+- The UI accepts `country`, `countryName` or `countryCode` on prospect documents and prefers an explicitly recorded country. When missing, it uses a limited city/country lookup on `location` or `city` and marks inferred values. If no supported location exists, it says **Country unknown**, rather than inventing one.
+- Each recommended contact has a **Working country** input and **Save** button to correct/enrich existing records in the Claude DB (`prospects`, or `outreach` for existing email outreach proposals). The outreach edit forms also include a working-country field, and the country is carried through when a prospect becomes an outreach contact.
+- **Backend handoff:** the existing Claude prospect discovery workflow is external to this repository. To get reliable countries for every *new* suggestion, instruct that workflow to research the **country where the person works** from public professional sources, and save it as `country: "United Kingdom"` etc. It should save `location` separately and leave `country` empty when unverified. Do not conflate nationality with work location.
+- No changes were made to the email pitch content or external scraping automation.
