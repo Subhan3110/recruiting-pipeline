@@ -807,6 +807,18 @@ input,select,textarea{border-radius:10px}
  .src,.kpi,.company-card,.chip,.theme-switch,.doc-card{transition:none!important}
 }
 
+
+.country-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:99px;
+ background:color-mix(in srgb,var(--mint) 28%,var(--surface));border:1px solid var(--line);
+ font:600 10px/1.3 var(--body);color:var(--ink);vertical-align:middle;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis;}
+.country-badge.missing{background:color-mix(in srgb,var(--peach) 17%,var(--surface));color:var(--muted)}
+.country-badge.inferred{background:var(--soft);color:var(--muted)}
+.it summary strong:has(.country-badge){display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.country-edit{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;background:var(--soft);padding:9px 11px;border-radius:10px}
+.country-edit label{min-width:145px;flex:1;font-size:11px;font-weight:600}
+.country-edit input{width:100%;font-size:12px}
+.country-edit button{white-space:nowrap}
+.country-edit .tri-meta{width:100%;margin:0}
 </style>
 
 <div class="wrap">
@@ -1077,8 +1089,8 @@ const STAT = {
 };
 const FIELDS = {
   applications: [["company","Firm"],["role","Role"],["division","Division / desk"],["location","Location"],["status","Status","status"],["applied","Applied on","date"],["deadline","Deadline","date"],["source","Logged from","sel",["Manual","Gmail","AI"]],["link","Posting link","url","full"],["notes","Notes","area","full"]],
-  linkedin: [["name","Name"],["firm","Firm"],["title","Title / desk"],["via","Referred by"],["status","Status","status"],["sent","Sent on","date"],["followUp","Follow up on","date"],["profile","Profile link","url"],["notes","Notes","area","full"]],
-  email: [["name","Name"],["firm","Firm"],["title","Title / desk"],["address","Email address"],["status","Status","status"],["sent","Sent on","date"],["followUp","Follow up on","date"],["via","Referred by"],["notes","Notes","area","full"]]
+  linkedin: [["name","Name"],["firm","Firm"],["title","Title / desk"],["country","Working country"],["via","Referred by"],["status","Status","status"],["sent","Sent on","date"],["followUp","Follow up on","date"],["profile","Profile link","url"],["notes","Notes","area","full"]],
+  email: [["name","Name"],["firm","Firm"],["title","Title / desk"],["country","Working country"],["address","Email address"],["status","Status","status"],["sent","Sent on","date"],["followUp","Follow up on","date"],["via","Referred by"],["notes","Notes","area","full"]]
 };
 const CH = {linkedin:"LinkedIn", email:"Email"};
 const live = new Set(["Applied","Online test","HireVue","Interview"]);
@@ -1095,6 +1107,80 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const personInitials = n => String(n||"?").trim().split(/\s+/).slice(0,2).map(x=>x[0]?.toUpperCase()||"").join("");
 const personHue = n => {let h=0;for(const c of String(n||""))h=(h*31+c.charCodeAt(0))%4;return "tone-"+h;};
 const personAvatar = n => `<span class="person-bubble ${personHue(n)}" aria-hidden="true">${esc(personInitials(n))}</span>`;
+
+/* Geographic location of professional, NOT citizenship or nationality.
+   Prefer confirmed country from research. Limited city lookup is marked "inferred".
+   Existing data is unchanged until the user saves a correction. */
+const COUNTRY_LOOKUP = [
+ ["United Kingdom","🇬🇧",["united kingdom","uk","england","scotland","wales"],["London","Manchester","Edinburgh"]],
+ ["Norway","🇳🇴",["norway","norge"],["Oslo","Bergen","Stavanger"]],
+ ["Sweden","🇸🇪",["sweden","sverige"],["Stockholm","Gothenburg","Göteborg","Malmö"]],
+ ["Denmark","🇩🇰",["denmark","danmark"],["Copenhagen","København","Aarhus"]],
+ ["Finland","🇫🇮",["finland"],["Helsinki"]],
+ ["Germany","🇩🇪",["germany","deutschland"],["Frankfurt","Berlin","Munich","München"]],
+ ["Switzerland","🇨🇭",["switzerland","schweiz"],["Zurich","Zürich","Geneva"]],
+ ["Netherlands","🇳🇱",["netherlands"],["Amsterdam","Rotterdam"]],
+ ["France","🇫🇷",["france"],["Paris"]],
+ ["Ireland","🇮🇪",["ireland"],["Dublin"]],
+ ["Italy","🇮🇹",["italy"],["Milan","Rome"]],
+ ["Spain","🇪🇸",["spain"],["Madrid","Barcelona"]],
+ ["United States","🇺🇸",["united states","usa","us"],["New York","Chicago","Boston","San Francisco"]],
+ ["Canada","🇨🇦",["canada"],["Toronto","Vancouver"]],
+ ["Singapore","🇸🇬",["singapore"],[]],
+ ["United Arab Emirates","🇦🇪",["united arab emirates","uae"],["Dubai","Abu Dhabi"]]
+];
+function locationToken(value,term){
+ const parts=String(value||"").toLowerCase().split(/[,/|·()\-]/).map(x=>x.trim());
+ return parts.some(part=>part===term.toLowerCase());
+}
+function personCountry(person){
+ const country=String(person?.country||person?.countryName||person?.countryCode||"").trim();
+ if(country){
+   const exact=COUNTRY_LOOKUP.find(([name,,aliases])=>[name,...aliases].some(s=>s.toLowerCase()===country.toLowerCase()));
+   return {name:exact?.[0]||country,flag:exact?.[1]||"🌐",kind:"known"};
+ }
+ const location=String(person?.location||person?.city||"").trim();
+ if(location){
+   const named=COUNTRY_LOOKUP.find(([name,,aliases])=>[name,...aliases].some(x=>locationToken(location,x)));
+   if(named)return {name:named[0],flag:named[1],kind:"location"};
+   const city=COUNTRY_LOOKUP.find(([,, ,cities])=>cities.some(x=>locationToken(location,x)));
+   if(city)return {name:city[0],flag:city[1],kind:"inferred"};
+ }
+ return {name:"Country unknown",flag:"🌐",kind:"missing"};
+}
+function countryBadge(person){
+ const c=personCountry(person);
+ return `<span class="country-badge ${c.kind}" title="${esc(c.kind==="known"?"Country provided by source":c.kind==="missing"?"No country recorded. Add it below.":"Based on location — please verify")}"><span aria-hidden="true">${esc(c.flag)}</span> ${esc(c.name)}${c.kind==="inferred"?"*":""}</span>`;
+}
+function countryEditor(person){
+ const c=personCountry(person);
+ return `<div class="country-edit"><label>Working country <input data-country-input value="${esc(c.kind==="missing"?"":c.name)}" placeholder="e.g. Norway" maxlength="70"></label>
+ <button type="button" class="btn" data-save-prospect-country="${esc(person.id)}" data-country-record="${person.kind==="o"?"outreach":"prospects"}">Save</button>
+ <span class="tri-meta">${c.kind==="inferred"?"Inferred from city — confirm before saving":c.kind==="missing"?"Not found yet":"Country of work, not nationality"}</span></div>`;
+}
+async function saveProspectCountry(button){
+ const id=button.dataset.saveProspectCountry;
+ const kind=button.dataset.countryRecord==="outreach"?"outreach":"prospects";
+ const row=(kind==="outreach"?state.outreach:prospects).find(r=>r.id===id);
+ const input=button.closest(".country-edit")?.querySelector("input[data-country-input]");
+ if(!row||!input)return;
+ const value=input.value.trim();
+ if(!value || value.length>70 || !/^[\p{L}\p{M} .()'-]+$/u.test(value)){
+   button.textContent="Invalid country";return;
+ }
+ const alias=COUNTRY_LOOKUP.find(([name,,list])=>[name,...list].some(x=>x.toLowerCase()===value.toLowerCase()));
+ const country=alias?.[0]||value;
+ const old=button.textContent;button.disabled=true;button.textContent="Saving…";
+ try{
+   if(db)await db.collection(kind).doc(id).update({country});
+   row.country=country;render();
+ }catch(e){button.textContent="Save failed";button.disabled=false;setSave(false,"Country not saved");}
+}
+document.addEventListener("click",e=>{
+ const b=e.target.closest("button[data-save-prospect-country]");
+ if(b)saveProspectCountry(b);
+});
+
 const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
 const days = iso => iso ? Math.round((today() - new Date(iso + "T00:00:00")) / 864e5) : null;
 const fmt = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"}) : "";
@@ -1644,10 +1730,10 @@ function renderToday(triItems){
       `<strong>${esc(x.a.company)}</strong><span class="m">${esc(x.a.status)}</span><span class="g">${esc(x.c.map(o => o.name).join(", "))}</span>`,
       `<p class="gist">${esc(x.a.role || "")}</p><p class="sug">Let ${esc(x.c[0].name)} know where you are in the process. A short update keeps you top of mind when the desk discusses candidates.</p>`, "d:w:" + x.a.id))],
     ["new","New people","LinkedIn people and cold emails to send","--s-prep", newP.map(p => item("np:" + p.id,
-      `<strong>${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g">${esc(p.why || "")}</span>${p.emailOnly ? '<span class="tag">Email</span>' : ""}`,
-      p.emailOnly ? split(`<p class="gist">${esc(p.why || "")}</p>${emailLine(p)}<div class="acts">${p.sourceUrl ? `<a class="btn" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener">Source</a>` : ""}<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button></div>`,
+      `<strong>${esc(p.name)} ${countryBadge(p)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g">${esc(p.why || "")}</span>${p.emailOnly ? '<span class="tag">Email</span>' : ""}`,
+      p.emailOnly ? split(`<p class="gist">${esc(p.why || "")}</p>${countryEditor(p)}${emailLine(p)}<div class="acts">${p.sourceUrl ? `<a class="btn" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener">Source</a>` : ""}<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button></div>`,
         draftBox("Cold email", p.emailBody, p.emailSubject, p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)) :
-      split(`<p class="gist">${esc(p.why || "")}</p><div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id))]
+      split(`<p class="gist">${esc(p.why || "")}</p>${countryEditor(p)}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id))]
   ];
   if (!todayInit && groups.some(g => g[4].length)){ todayInit = true; groups.forEach(g => { if (g[4].length && ["dl","reply","thank"].includes(g[0])) openKeys.add("today:" + g[0]); }); }
   $("today").innerHTML = groups.map(([k,label,sub,c,rows]) => `<details class="cat" data-key="today:${k}" style="--c:var(${c})"${openKeys.has("today:" + k) ? " open" : ""}${rows.length ? "" : " data-empty"}>
@@ -1736,7 +1822,7 @@ function renderTable(v){
   } else {
     head.innerHTML = `<tr><th>Person</th><th>${v === "email" ? "Address" : "Referred by"}</th><th>Status</th><th>Sent</th><th>Waiting</th><th>Notes</th><th></th></tr>`;
     body.innerHTML = rows.length ? rows.map(r => { const d = r.status === "Sent" ? days(r.sent) : null; return `<tr>
-      <td class="who">${personAvatar(r.name)}<strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))}</small>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
+      <td class="who">${personAvatar(r.name)}<strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))} · ${esc(personCountry(r).flag)} ${esc(personCountry(r).name)}</small>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
       <td>${v === "email" ? (r.address ? `<span style="font-family:var(--mono);font-size:12px">${esc(r.address)}</span>` : dash) : (r.via ? esc(r.via) : dash)}</td>
       <td>${pill(r)}</td><td class="num">${fmt(r.sent) || dash}</td>
       <td class="num ${d >= 7 ? "overdue" : ""}">${d != null ? d + "d" : dash}</td>
@@ -1980,15 +2066,15 @@ function renderProspects(){
   const open = prospects.filter(p => (p.status || "New") === "New").sort((a,b) => String(b.foundAt||"").localeCompare(String(a.foundAt||"")));
   const openLi = open.filter(p => !p.emailOnly);
   $("pros-li").innerHTML = openLi.length ? openLi.map(p => item("p:" + p.id,
-      `<strong>${personAvatar(p.name)}${esc(p.name)}${p.connected ? '<span class="tag">Connected</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
-      split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${emailLine(p)}
+      `<strong>${personAvatar(p.name)}${esc(p.name)} ${countryBadge(p)}${p.connected ? '<span class="tag">Connected</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
+      split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${countryEditor(p)}${emailLine(p)}
        <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
   $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New"), "li");
   const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
-      `<strong>${personAvatar(p.name)}${esc(p.name)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
-      split(`${emailLine(p)}
+      `<strong>${personAvatar(p.name)}${esc(p.name)} ${countryBadge(p)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
+      split(`${countryEditor(p)}${emailLine(p)}
        <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject, p.kind === "p" && p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and rates each guess high, medium or low.</p>`;
   $("pros-em").innerHTML += doneList(prospects.filter(p => (p.emailGuess || p.emailBody) && p.status && p.status !== "New"), "em");
@@ -1998,8 +2084,8 @@ function doneList(list, k){
   if (!list.length) return "";
   const key = "done:" + k;
   return `<details class="cat" data-key="${key}" style="--c:var(--s-cold)"${openKeys.has(key) ? " open" : ""}><summary><span class="cl">Contacted or skipped</span><span class="cs">Address and message kept here</span><b>${list.length}</b></summary><div class="ilist">${list.map(p => item("pd:" + k + ":" + p.id,
-    `<strong>${esc(p.name)}<span class="tag">${esc(p.status)}</span></strong><span class="m">${esc(p.firm || "")}</span><span class="g ${k === "em" ? "addr-i" : ""}">${esc(k === "em" ? (p.emailGuess || "") : (p.why || ""))}</span>`,
-    split(`${k === "em" ? emailLine(p) : `<p class="gist">${esc(p.why || "")}</p>`}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn" data-pact="undo" data-pid="${p.id}">Move back to new</button></div>`,
+    `<strong>${esc(p.name)} ${countryBadge(p)}<span class="tag">${esc(p.status)}</span></strong><span class="m">${esc(p.firm || "")}</span><span class="g ${k === "em" ? "addr-i" : ""}">${esc(k === "em" ? (p.emailGuess || "") : (p.why || ""))}</span>`,
+    split(`${countryEditor(p)}${k === "em" ? emailLine(p) : `<p class="gist">${esc(p.why || "")}</p>`}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn" data-pact="undo" data-pid="${p.id}">Move back to new</button></div>`,
       k === "em" ? draftBox("Cold email", p.emailBody, p.emailSubject) : draftBox(p.connected ? "Message" : "Connection note", p.liDraft)))).join("")}</div></details>`;
 }
 async function prospectAction(act, id){
@@ -2013,7 +2099,7 @@ async function prospectAction(act, id){
   }
   const hadRow = state.outreach.some(r => r.id === id);
   if (act === "li" || act === "em"){
-    write("outreach", id, {name:p.name, firm:p.firm || "", title:p.title || "", channel: act === "li" ? "LinkedIn" : "Email", status:"Sent", sent:now,
+    write("outreach", id, {name:p.name, firm:p.firm || "", title:p.title || "", country:personCountry(p).kind==="missing"?"":personCountry(p).name, location:p.location || "", channel: act === "li" ? "LinkedIn" : "Email", status:"Sent", sent:now,
       ...(act === "em" ? {address:p.emailGuess || ""} : {profile:p.profileUrl || ""}), notes:p.why || ""});
   }
   p.status = act === "skip" ? "Skipped" : "Contacted"; if (p.status === "Contacted" && !hadRow) p.contactedAt = now; render();
@@ -2070,7 +2156,7 @@ function loadSample(){
     {id:"o2", name:"Kari Eksempel", firm:"Nordic Example", title:"Analyst", channel:"LinkedIn", status:"Sent", sent:d(9), notes:"Sample contact, follow-up due."},
     {id:"o3", name:"Jamie Demo", firm:"Demo Capital", title:"VP", channel:"Email", status:"Replied", sent:d(6), address:"jamie.demo@example.com", notes:"Sample contact."}
   ];
-  prospects = [{id:"p1", name:"Ola Prospect", firm:"Example Securities", title:"Analyst, Equity Sales", location:"London", why:"Sample: BI alum on an equity sales desk", status:"New", foundAt:new Date().toISOString(),
+  prospects = [{id:"p1", name:"Ola Prospect", firm:"Example Securities", title:"Analyst, Equity Sales", location:"London", country:"United Kingdom", why:"Sample: BI alum on an equity sales desk", status:"New", foundAt:new Date().toISOString(),
     liDraft:"Hei Ola! Sample connection note. Hilsen Subhan", emailGuess:"ola.prospect@example.com", emailConfidence:"medium", emailPattern:"first.last@example.com",
     emailSubject:"Sample subject", emailBody:"Hi Ola, this is a sample cold email. Would you have 15 minutes next week? Best, Subhan Butt, MSc Finance, Imperial College London"}];
   const triItem = (name, firm, bucket, gist, draft) => ({name, firm, bucket, lastFrom: bucket === "followup" || bucket === "waiting" ? "you" : "them", lastDate:d(3), gist, suggestion:"Sample suggestion.", draft});
