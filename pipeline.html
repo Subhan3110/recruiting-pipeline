@@ -808,6 +808,17 @@ input,select,textarea{border-radius:10px}
 }
 
 
+.pitch-meta{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}
+.pitch-meta span{font-size:11px;color:var(--muted);background:var(--soft);border-radius:6px;padding:2px 7px}
+.learn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px}
+.learn-h{font:700 13px var(--display);margin:0 0 6px}
+.learn-t{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:12px}
+.learn-t th:first-child,.learn-t td:first-child{width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.learn-t th{font-size:10px;text-align:right;padding:6px 8px}
+.learn-t th:first-child{text-align:left}
+.learn-t td{padding:6px 8px;border-top:1px solid var(--line)}
+.learn-t td.num{text-align:right;font-family:var(--mono)}
+.learn-t tr.few td{color:var(--muted)}
 .country-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:99px;
  background:color-mix(in srgb,var(--mint) 28%,var(--surface));border:1px solid var(--line);
  font:600 10px/1.3 var(--body);color:var(--ink);vertical-align:middle;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis;}
@@ -911,6 +922,11 @@ input,select,textarea{border-radius:10px}
     <div>
       <h2 class="sec section-heading"><span class="section-title"><span class="section-symbol symbol-lime">✳</span><span>On your radar <small>THE NEXT MOVES</small></span></span><span>Replies, follow-ups and fresh opportunities</span></h2>
       <div class="stack" id="today"></div>
+    </div>
+    <div class="panel-box" id="learn-box">
+      <div class="tri-head"><div><h2>Hva gir svar <span class="tag" id="learn-n">0 sendt</span></h2>
+        <p class="tri-meta">Svar, positive svar og bookede samtaler per emnefamilie og type kobling. Bare e-poster og meldinger sendt etter pitch v3 telles; under 20 sendt i en gruppe er for lite til å trekke konklusjoner.</p></div></div>
+      <div class="learn-grid" id="learn"></div>
     </div>
     <div class="funnels">
       <div><h2 class="sec">Applications funnel <span>Reached each stage or later</span></h2><div class="fun" id="fn-ov-app"></div></div>
@@ -1201,7 +1217,7 @@ const kindOf = v => v === "applications" ? "applications" : "outreach";
 const color = (kind, s) => (STAT[kind].find(x => x[0] === s) || [0,"--s-prep"])[1];
 const rate = rows => { const s = rows.filter(r => contacted.has(r.status)).length; return s ? Math.round(rows.filter(r => replied.has(r.status)).length / s * 100) + "%" : "–"; };
 const lastTouch = r => [r.sent, r.followedUp].filter(Boolean).sort().pop();
-const overdue = r => r.status === "Sent" && ((days(lastTouch(r)) ?? 0) >= 7 || (r.followUp && days(r.followUp) >= 0));
+const overdue = r => r.status === "Sent" && ((days(lastTouch(r)) ?? 0) >= 4 || (r.followUp && days(r.followUp) >= 0));
 const TYPES = ["Summer","Off-cycle","Graduate","Part-time","Event","Other"];
 function typeOf(r){
   if (r.type) return r.type;
@@ -1677,7 +1693,27 @@ function renderFunnel(kind, barId, legId, nId){
   $(legId).innerHTML = STAT[kind].map(([s,c]) => `<span><i class="dot" style="background:var(${c})"></i>${s} <b>${rows.filter(r => r.status === s).length}</b></span>`).join("");
 }
 
+function renderLearning(){
+  const root = $("learn"); if (!root) return;
+  const rows = state.outreach.filter(r => r.subjectFamily || r.connectionType);
+  $("learn-n").textContent = rows.length + " sendt";
+  const pos = new Set(["Replied","Call booked","Call done"]);
+  const pct = (a, n) => n ? Math.round(a / n * 100) + " %" : "–";
+  const table = (title, key, labels, src = rows) => {
+    const groups = {};
+    src.forEach(r => { const g = r[key] || "ukjent"; (groups[g] ||= []).push(r); });
+    const keys = Object.keys(groups).sort((a,b) => groups[b].length - groups[a].length);
+    return `<div><h3 class="learn-h">${esc(title)}</h3><table class="learn-t"><thead><tr><th></th><th>Sendt</th><th>Svar</th><th title="Positive svar">Pos.</th><th title="Bookede samtaler">Samt.</th></tr></thead><tbody>${keys.length ? keys.map(g => { const list = groups[g], n = list.length;
+      const rep = list.filter(r => replied.has(r.status)).length, ps = list.filter(r => pos.has(r.status)).length, calls = list.filter(r => met.has(r.status)).length;
+      return `<tr class="${n < 20 ? "few" : ""}"><td>${esc(labels[g] || g)}</td><td class="num">${n}</td><td class="num">${pct(rep, n)}</td><td class="num">${pct(ps, n)}</td><td class="num">${pct(calls, n)}</td></tr>`; }).join("")
+      : `<tr><td colspan="5" class="empty-note">Ingen sendt ennå med v3.</td></tr>`}</tbody></table></div>`;
+  };
+  const ab = rows.filter(r => r.variant);
+  root.innerHTML = table("Emnefamilie", "subjectFamily", FAM_LABEL) + table("Kobling", "connectionType", CONN_LABEL) +
+    (ab.length ? table("A/B-test: Skole (A) mot Team (B)", "variant", {A:"A: Skole", B:"B: Team/tema"}, ab) : "");
+}
 function renderOverview(){
+  renderLearning();
   const O = state.outreach, A = state.applications, LI = ofCh("LinkedIn"), EM = ofCh("Email");
   const triItems = [...(tri.li.data?.items || []).map(i => ({...i, ch:"LinkedIn"})), ...(tri.em.data?.items || []).map(i => ({...i, ch:"Email"}))];
   $("k-out").textContent = O.length; $("k-reply").textContent = rate(O);
@@ -2071,6 +2107,13 @@ function showToast(msg, undoFn){
 document.addEventListener("click", e => { const b = e.target.closest("button.trash"); if (!b) return; e.preventDefault(); e.stopPropagation(); trashIt(b.dataset.trash); }, true);
 document.addEventListener("toggle", e => { const d = e.target; if (d.matches?.("details.it, details.cat")) { d.open ? openKeys.add(d.dataset.key) : openKeys.delete(d.dataset.key); } }, true);
 
+const FAM_LABEL = {REFERRAL:"Referanse", SCHOOL:"Skole", PATH:"Karrierevei", TEAM:"Team/tema"};
+const CONN_LABEL = {referral:"referanse", warm:"varm", mutual:"felles kontakt", alumni:"alumni", employer:"samme arbeidsgiver", nordic:"nordisk kobling", cold:"kald"};
+function pitchMeta(p){
+  if (!p.subjectFamily && !p.connectionType) return "";
+  const bits = [p.subjectFamily ? "Emne: " + (FAM_LABEL[p.subjectFamily] || p.subjectFamily) : "", p.connectionType ? "Kobling: " + (CONN_LABEL[p.connectionType] || p.connectionType) : "", p.variant ? "Test " + p.variant : "", p.question ? "Spørsmål: " + p.question : ""].filter(Boolean);
+  return `<div class="pitch-meta">${bits.map(b => `<span>${esc(b)}</span>`).join("")}</div>`;
+}
 function emailLine(p){
   if (!p.emailGuess) return `<div class="src-l">No address yet. Press Check email on the Email tab to look it up.</div>`;
   return `<div class="addr"><span>${esc(p.emailGuess)}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc(p.emailConfidence || "low")}</span><button class="copy" data-copytext="${esc(p.emailGuess)}">Copy</button></div>
@@ -2081,14 +2124,14 @@ function renderProspects(){
   const openLi = open.filter(p => !p.emailOnly);
   $("pros-li").innerHTML = openLi.length ? openLi.map(p => item("p:" + p.id,
       `<strong>${personAvatar(p.name)}<span class="nm">${esc(p.name)}</span>${countryChip(p)}${p.connected ? '<span class="conn" title="Already connected on LinkedIn" aria-label="Connected">✓</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
-      split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${countryEditor(p)}${emailLine(p)}
+      split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}
        <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
   $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New"), "li");
   const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
       `<strong>${personAvatar(p.name)}<span class="nm">${esc(p.name)}</span>${countryChip(p)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
-      split(`${countryEditor(p)}${emailLine(p)}
+      split(`${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}
        <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject, p.kind === "p" && p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and rates each guess high, medium or low.</p>`;
   $("pros-em").innerHTML += doneList(prospects.filter(p => (p.emailGuess || p.emailBody) && p.status && p.status !== "New"), "em");
@@ -2114,7 +2157,8 @@ async function prospectAction(act, id){
   const hadRow = state.outreach.some(r => r.id === id);
   if (act === "li" || act === "em"){
     write("outreach", id, {name:p.name, firm:p.firm || "", title:p.title || "", country:personCountry(p).kind==="missing"?"":personCountry(p).name, location:p.location || "", channel: act === "li" ? "LinkedIn" : "Email", status:"Sent", sent:now,
-      ...(act === "em" ? {address:p.emailGuess || ""} : {profile:p.profileUrl || ""}), notes:p.why || ""});
+      ...(act === "em" ? {address:p.emailGuess || ""} : {profile:p.profileUrl || ""}), notes:p.why || "",
+      ...Object.fromEntries(["subjectFamily","connectionType","seniority","division","variant","angle","pitchVersion","emailSubject"].filter(k => p[k] !== undefined && p[k] !== "").map(k => [k, p[k]]))});
   }
   p.status = act === "skip" ? "Skipped" : "Contacted"; if (p.status === "Contacted" && !hadRow) p.contactedAt = now; render();
   showToast(act === "skip" ? `Skipped ${p.name}` : `${p.name} marked as sent`, () => prospectAction("undo", id));
