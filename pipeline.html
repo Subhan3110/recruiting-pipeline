@@ -813,12 +813,20 @@ input,select,textarea{border-radius:10px}
  font:600 10px/1.3 var(--body);color:var(--ink);vertical-align:middle;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis;}
 .country-badge.missing{background:color-mix(in srgb,var(--peach) 17%,var(--surface));color:var(--muted)}
 .country-badge.inferred{background:var(--soft);color:var(--muted)}
-.it summary strong:has(.country-badge){display:flex;align-items:center;flex-wrap:wrap;gap:5px}
-.country-edit{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;background:var(--soft);padding:9px 11px;border-radius:10px}
-.country-edit label{min-width:145px;flex:1;font-size:11px;font-weight:600}
-.country-edit input{width:100%;font-size:12px}
-.country-edit button{white-space:nowrap}
-.country-edit .tri-meta{width:100%;margin:0}
+.it summary strong{flex-wrap:nowrap}
+.it summary strong .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.it summary strong .tag{flex:none;margin-left:6px}
+.it summary{grid-template-columns:minmax(0,240px) minmax(0,160px) minmax(0,1fr) auto}
+@media (max-width:560px){.it summary{grid-template-columns:minmax(0,1fr) auto}}
+.conn{flex:none;margin-left:5px;width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;font-size:10px;font-weight:800;background:var(--ring);color:var(--accent);cursor:help}
+.cchip{flex:none;margin-left:6px;font-size:13px;line-height:1;cursor:help}
+.cchip.missing{font:700 10px var(--mono);color:var(--muted);border:1px dashed var(--line);border-radius:5px;padding:2px 4px}
+.cchip.inferred{opacity:.75}
+.country-edit{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:2px 0 4px}
+.country-edit .ce-l{white-space:nowrap;font-weight:600}
+.country-edit input{width:130px;min-height:28px;padding:3px 8px;font-size:12px}
+.country-edit .btn{padding:4px 9px;font-size:11px;min-height:28px}
+.country-edit .ce-h{font-size:11px;font-style:italic}
 </style>
 
 <div class="wrap">
@@ -1152,11 +1160,16 @@ function countryBadge(person){
  const c=personCountry(person);
  return `<span class="country-badge ${c.kind}" title="${esc(c.kind==="known"?"Country provided by source":c.kind==="missing"?"No country recorded. Add it below.":"Based on location — please verify")}"><span aria-hidden="true">${esc(c.flag)}</span> ${esc(c.name)}${c.kind==="inferred"?"*":""}</span>`;
 }
+function countryChip(person){
+ const c=personCountry(person);
+ const label=c.kind==="missing"?"Country unknown":c.name+(c.kind==="inferred"?" (from city, please verify)":"");
+ return `<span class="cchip ${c.kind}" title="${esc(label)}" aria-label="${esc(label)}">${c.kind==="missing"?"?":esc(c.flag)}</span>`;
+}
 function countryEditor(person){
  const c=personCountry(person);
- return `<div class="country-edit"><label>Working country <input data-country-input value="${esc(c.kind==="missing"?"":c.name)}" placeholder="e.g. Norway" maxlength="70"></label>
+ return `<div class="country-edit" title="Country they work in, not nationality"><span class="ce-l">${esc(c.kind==="missing"?"🌐":c.flag)} Works in</span><input data-country-input aria-label="Working country" value="${esc(c.kind==="missing"?"":c.name)}" placeholder="Add country" maxlength="70">
  <button type="button" class="btn" data-save-prospect-country="${esc(person.id)}" data-country-record="${person.kind==="o"?"outreach":"prospects"}">Save</button>
- <span class="tri-meta">${c.kind==="inferred"?"Inferred from city — confirm before saving":c.kind==="missing"?"Not found yet":"Country of work, not nationality"}</span></div>`;
+ ${c.kind==="inferred"?'<span class="ce-h">from city, check</span>':""}</div>`;
 }
 async function saveProspectCountry(button){
  const id=button.dataset.saveProspectCountry;
@@ -1730,7 +1743,7 @@ function renderToday(triItems){
       `<strong>${esc(x.a.company)}</strong><span class="m">${esc(x.a.status)}</span><span class="g">${esc(x.c.map(o => o.name).join(", "))}</span>`,
       `<p class="gist">${esc(x.a.role || "")}</p><p class="sug">Let ${esc(x.c[0].name)} know where you are in the process. A short update keeps you top of mind when the desk discusses candidates.</p>`, "d:w:" + x.a.id))],
     ["new","New people","LinkedIn people and cold emails to send","--s-prep", newP.map(p => item("np:" + p.id,
-      `<strong>${esc(p.name)} ${countryBadge(p)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g">${esc(p.why || "")}</span>${p.emailOnly ? '<span class="tag">Email</span>' : ""}`,
+      `<strong><span class="nm">${esc(p.name)}</span>${countryChip(p)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g">${esc(p.why || "")}</span>${p.emailOnly ? '<span class="tag">Email</span>' : ""}`,
       p.emailOnly ? split(`<p class="gist">${esc(p.why || "")}</p>${countryEditor(p)}${emailLine(p)}<div class="acts">${p.sourceUrl ? `<a class="btn" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener">Source</a>` : ""}<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button></div>`,
         draftBox("Cold email", p.emailBody, p.emailSubject, p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)) :
       split(`<p class="gist">${esc(p.why || "")}</p>${countryEditor(p)}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id))]
@@ -2066,14 +2079,14 @@ function renderProspects(){
   const open = prospects.filter(p => (p.status || "New") === "New").sort((a,b) => String(b.foundAt||"").localeCompare(String(a.foundAt||"")));
   const openLi = open.filter(p => !p.emailOnly);
   $("pros-li").innerHTML = openLi.length ? openLi.map(p => item("p:" + p.id,
-      `<strong>${personAvatar(p.name)}${esc(p.name)} ${countryBadge(p)}${p.connected ? '<span class="tag">Connected</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
+      `<strong>${personAvatar(p.name)}<span class="nm">${esc(p.name)}</span>${countryChip(p)}${p.connected ? '<span class="conn" title="Already connected on LinkedIn" aria-label="Connected">✓</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${esc(p.emailConfidence || "low")}">@</span>` : ""}`,
       split(`<p class="gist">${esc(p.why)}${p.location ? " · " + esc(p.location) : ""}</p>${countryEditor(p)}${emailLine(p)}
        <div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button></div>`, p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft)), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
   $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New"), "li");
   const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
-      `<strong>${personAvatar(p.name)}${esc(p.name)} ${countryBadge(p)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
+      `<strong>${personAvatar(p.name)}<span class="nm">${esc(p.name)}</span>${countryChip(p)}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${esc(p.emailConfidence || "low")}">${esc((p.emailConfidence || "low")[0].toUpperCase())}</span>`,
       split(`${countryEditor(p)}${emailLine(p)}
        <div class="acts">${p.kind === "p" ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button><button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button>` : `<button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button>`}</div>`, draftBox("Cold email", p.emailBody, p.emailSubject, p.kind === "p" && p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and rates each guess high, medium or low.</p>`;
@@ -2084,7 +2097,7 @@ function doneList(list, k){
   if (!list.length) return "";
   const key = "done:" + k;
   return `<details class="cat" data-key="${key}" style="--c:var(--s-cold)"${openKeys.has(key) ? " open" : ""}><summary><span class="cl">Contacted or skipped</span><span class="cs">Address and message kept here</span><b>${list.length}</b></summary><div class="ilist">${list.map(p => item("pd:" + k + ":" + p.id,
-    `<strong>${esc(p.name)} ${countryBadge(p)}<span class="tag">${esc(p.status)}</span></strong><span class="m">${esc(p.firm || "")}</span><span class="g ${k === "em" ? "addr-i" : ""}">${esc(k === "em" ? (p.emailGuess || "") : (p.why || ""))}</span>`,
+    `<strong><span class="nm">${esc(p.name)}</span>${countryChip(p)}<span class="tag">${esc(p.status)}</span></strong><span class="m">${esc(p.firm || "")}</span><span class="g ${k === "em" ? "addr-i" : ""}">${esc(k === "em" ? (p.emailGuess || "") : (p.why || ""))}</span>`,
     split(`${countryEditor(p)}${k === "em" ? emailLine(p) : `<p class="gist">${esc(p.why || "")}</p>`}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn" data-pact="undo" data-pid="${p.id}">Move back to new</button></div>`,
       k === "em" ? draftBox("Cold email", p.emailBody, p.emailSubject) : draftBox(p.connected ? "Message" : "Connection note", p.liDraft)))).join("")}</div></details>`;
 }
