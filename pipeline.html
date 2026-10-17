@@ -2020,7 +2020,8 @@ function renderTriage(k){
   const doneAt = t.data?.runAt ? new Date(t.data.runAt) : null;
   const running = t.req && (!doneAt || new Date(t.req) > doneAt) && (Date.now() - new Date(t.req)) < 20*60e3;
   btn.disabled = !!running; btn.textContent = running ? "Checking…" : s.btn;
-  $("tri-meta-" + k).textContent = doneAt ? "Last checked " + doneAt.toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "Not checked yet.";
+  const nc = tri[k].data?.newCount;
+  $("tri-meta-" + k).textContent = doneAt ? "Last checked " + doneAt.toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) + (typeof nc === "number" ? (nc ? " · " + nc + " new" : " · nothing new") : "") : "Not checked yet.";
   if (running){ note.hidden = false; note.className = "tri-note"; note.textContent = s.running; }
   else if (t.data?.status === "error"){ note.hidden = false; note.className = "tri-note err"; note.textContent = t.data.message || s.err; }
   else if (!note.dataset.sticky) note.hidden = true;
