@@ -1750,7 +1750,7 @@ function triBody(i){
   const key = triKey(i); triMap.set(key, i);
   const acts = i.draft && !doneMap[key] ? `<div class="acts"><button class="btn primary" data-msent="${esc(key)}">Mark sent</button></div>` : doneTag(key);
   return split(`<p class="gist">${esc(i.gist)}</p>${i.suggestion ? `<p class="sug">${esc(i.suggestion)}</p>` : ""}${acts}`,
-    draftBox("Draft", i.draft, i.subject, {key, channel: i.ch, name: i.name, firm: i.firm, threadUrl: i.threadUrl, emailUrl: i.emailUrl, profileUrl: (state.outreach.find(r => nameKey(r.name) === nameKey(i.name)) || {}).profile}));
+    draftBox("Draft", i.draft, i.subject, {key, channel: i.ch, name: i.name, firm: i.firm, threadUrl: i.threadUrl, emailUrl: i.emailUrl, threadId: i.threadId || "", profileUrl: (state.outreach.find(r => nameKey(r.name) === nameKey(i.name)) || {}).profile}));
 }
 function renderToday(triItems){
   const open = triItems.filter(i => !doneMap[triKey(i)] && !dismissed[triKey(i)]);
@@ -2023,12 +2023,49 @@ async function fireSend(key){
   const logId = safeId(key) + "-" + Date.now().toString(36);
   confirming.delete(key); sendState.set(key, {status:"sending", logId}); render();
   if (!mcp){ sendState.set(key, {status:"failed", error:"open the tracker in claude.ai to send"}); render(); return; }
+  if (c.channel === "Email") return sendEmailDirect(key, c, text, logId);
   const payload = {key, logId, channel:c.channel, name:c.name, firm:c.firm || "", threadUrl:c.threadUrl || "", profileUrl:c.profileUrl || "", emailUrl:c.emailUrl || "", to:c.to || "", subject:c.subject || "", text};
   try {
     if (db) db.collection("sendlog").doc(logId).set({status:"sending", key, name:c.name, channel:c.channel, at:new Date().toISOString(), error:""}).catch(() => {});
     await mcp.callTool("Claude Code Remote", "fire_trigger", {trigger_id: SEND_TRIGGER, text: JSON.stringify(payload)});
   } catch(e){
     sendState.set(key, {status:"failed", error: e.code === "not_in_manifest" || e.code === "approval_required" ? "the page needs your OK, press Send again and allow it" : "could not start sending"}); render();
+  }
+}
+/* Email: the page sends straight from the viewer's own Gmail, right after the click and the confirm. */
+const isEmail = s => /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(s || "");
+async function sendEmailDirect(key, c, text, logId){
+  const fail = msg => { sendState.set(key, {status:"failed", error:msg}); render();
+    if (db) db.collection("sendlog").doc(logId).set({status:"failed", key, name:c.name, channel:"Email", at:new Date().toISOString(), error:msg}).catch(() => {}); };
+  if (!text.trim()) return fail("the draft is empty");
+  let res;
+  try {
+    if (c.threadId){
+      const th = (await mcp.callTool("Gmail", "get_thread", {threadId: c.threadId, messageFormat: "METADATA_ONLY"}, {cache:false})).payload || {};
+      const msgs = th.messages || [];
+      const last = msgs[msgs.length - 1];
+      if (!last?.id) return fail("could not find the email thread, use Copy and reply in Gmail");
+      res = await mcp.callTool("Gmail", "reply", {messageId: last.id, body: text, includeSignature: false}, {cache:false});
+    } else if (isEmail(c.to)){
+      res = await mcp.callTool("Gmail", "send_message", {to:[c.to.trim()], subject: c.subject || "", body: text, includeSignature: false}, {cache:false});
+    } else {
+      return fail(c.emailUrl ? "this reply needs the email thread id, use Copy and reply in Gmail" : "no email address on this person");
+    }
+  } catch(e){
+    const m = {needs_reauth:"reconnect Gmail in claude.ai Settings, Connectors", server_not_connected:"add the Gmail connector in claude.ai Settings, Connectors",
+      not_in_manifest:"Gmail was not allowed for this page, press Send again and allow it", approval_required:"Gmail needs your OK, press Send again and allow it",
+      blocked_by_policy:"your organisation blocks sending from here", tool_error:"Gmail refused it: " + String(e.message || "").slice(0, 140)}[e.code];
+    const unsure = e.code === "server_unavailable" || e.code === "upstream_error" || e.code === "cancelled";
+    return fail(m || (unsure ? "no answer from Gmail. Check Sent in Gmail before pressing Send again" : "could not send (" + (e.code || "error") + ")"));
+  }
+  const today = new Date().toISOString().slice(0,10);
+  sendState.set(key, {status:"sent", at:new Date().toISOString()}); render();
+  if (!db) return;
+  db.collection("sendlog").doc(logId).set({status:"sent", key, name:c.name, channel:"Email", at:new Date().toISOString(), error:"", gmailId: res?.payload?.id || ""}).catch(() => {});
+  if (!key.startsWith("cold:")){
+    doneMap = {...doneMap, [key]: today}; db.doc("triage/done").set({items: doneMap}).catch(() => {});
+    const row = state.outreach.find(r => nameKey(r.name) === nameKey(c.name));
+    if (row) db.collection("outreach").doc(row.id).update({lastContact: today}).catch(() => {});
   }
 }
 document.addEventListener("input", e => { const k = e.target.dataset?.edtext; if (k) edits.set(k, e.target.value); });
