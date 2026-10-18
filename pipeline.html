@@ -848,6 +848,7 @@ input,select,textarea{border-radius:10px}
 .learn-t td{padding:6px 8px;border-top:1px solid var(--line)}
 .learn-t td.num{text-align:right;font-family:var(--mono)}
 .learn-t tr.few td{color:var(--muted)}
+@media (max-width:560px){.learn-t th:first-child,.learn-t td:first-child{width:30%}.learn-t th{padding:6px 3px;letter-spacing:0;font-size:9px}.learn-t td{padding:6px 3px}}
 .country-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:99px;
  background:color-mix(in srgb,var(--mint) 28%,var(--surface));border:1px solid var(--line);
  font:600 10px/1.3 var(--body);color:var(--ink);vertical-align:middle;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis;}
@@ -962,8 +963,8 @@ input,select,textarea{border-radius:10px}
       <div class="stack" id="today"></div>
     </div>
     <div class="panel-box" id="learn-box">
-      <div class="tri-head"><div><h2>Hva gir svar <span class="tag" id="learn-n">0 sendt</span></h2>
-        <p class="tri-meta">Svar, positive svar og bookede samtaler per emnefamilie og type kobling. Bare e-poster og meldinger sendt etter pitch v3 telles; under 20 sendt i en gruppe er for lite til å trekke konklusjoner.</p></div></div>
+      <div class="tri-head"><div><h2>What gets replies <span class="tag" id="learn-n">0 sent</span></h2>
+        <p class="tri-meta">Replies, positive replies and booked calls by subject type and type of connection. Only emails and messages sent with pitch v3 count. Under 20 sent in a group is too few to draw conclusions.</p></div></div>
       <div class="learn-grid" id="learn"></div>
     </div>
     <div class="funnels">
@@ -1740,21 +1741,21 @@ function renderFunnel(kind, barId, legId, nId){
 function renderLearning(){
   const root = $("learn"); if (!root) return;
   const rows = state.outreach.filter(r => r.subjectFamily || r.connectionType);
-  $("learn-n").textContent = rows.length + " sendt";
+  $("learn-n").textContent = rows.length + " sent";
   const pos = new Set(["Replied","Call booked","Call done"]);
   const pct = (a, n) => n ? Math.round(a / n * 100) + " %" : "–";
   const table = (title, key, labels, src = rows) => {
     const groups = {};
-    src.forEach(r => { const g = r[key] || "ukjent"; (groups[g] ||= []).push(r); });
+    src.forEach(r => { const g = r[key] || "unknown"; (groups[g] ||= []).push(r); });
     const keys = Object.keys(groups).sort((a,b) => groups[b].length - groups[a].length);
-    return `<div><h3 class="learn-h">${esc(title)}</h3><table class="learn-t"><thead><tr><th></th><th>Sendt</th><th>Svar</th><th title="Positive svar">Pos.</th><th title="Bookede samtaler">Samt.</th></tr></thead><tbody>${keys.length ? keys.map(g => { const list = groups[g], n = list.length;
+    return `<div><h3 class="learn-h">${esc(title)}</h3><table class="learn-t"><thead><tr><th></th><th>Sent</th><th title="Any reply">Replies</th><th title="Positive replies: they replied and were open to talking (Replied, Call booked or Call done)">Positive</th><th title="Calls booked or done">Calls</th></tr></thead><tbody>${keys.length ? keys.map(g => { const list = groups[g], n = list.length;
       const rep = list.filter(r => replied.has(r.status)).length, ps = list.filter(r => pos.has(r.status)).length, calls = list.filter(r => met.has(r.status)).length;
       return `<tr class="${n < 20 ? "few" : ""}"><td>${esc(labels[g] || g)}</td><td class="num">${n}</td><td class="num">${pct(rep, n)}</td><td class="num">${pct(ps, n)}</td><td class="num">${pct(calls, n)}</td></tr>`; }).join("")
-      : `<tr><td colspan="5" class="empty-note">Ingen sendt ennå med v3.</td></tr>`}</tbody></table></div>`;
+      : `<tr><td colspan="5" class="empty-note">Nothing sent with v3 yet.</td></tr>`}</tbody></table></div>`;
   };
   const ab = rows.filter(r => r.variant);
-  root.innerHTML = table("Emnefamilie", "subjectFamily", FAM_LABEL) + table("Kobling", "connectionType", CONN_LABEL) +
-    (ab.length ? table("A/B-test: Skole (A) mot Team (B)", "variant", {A:"A: Skole", B:"B: Team/tema"}, ab) : "");
+  root.innerHTML = table("Subject type", "subjectFamily", FAM_LABEL) + table("Connection", "connectionType", CONN_LABEL) +
+    (ab.length ? table("A/B test: School (A) vs Team (B)", "variant", {A:"A: School", B:"B: Team / topic"}, ab) : "");
 }
 /* ---------- today's queue: who to contact now, and why ---------- */
 const DAILY_GOAL = 8;
@@ -2204,11 +2205,11 @@ function showToast(msg, undoFn){
 document.addEventListener("click", e => { const b = e.target.closest("button.trash"); if (!b) return; e.preventDefault(); e.stopPropagation(); trashIt(b.dataset.trash); }, true);
 document.addEventListener("toggle", e => { const d = e.target; if (d.matches?.("details.it, details.cat")) { d.open ? openKeys.add(d.dataset.key) : openKeys.delete(d.dataset.key); } }, true);
 
-const FAM_LABEL = {REFERRAL:"Referanse", SCHOOL:"Skole", PATH:"Karrierevei", TEAM:"Team/tema"};
-const CONN_LABEL = {referral:"referanse", warm:"varm", mutual:"felles kontakt", alumni:"alumni", employer:"samme arbeidsgiver", nordic:"nordisk kobling", cold:"kald"};
+const FAM_LABEL = {REFERRAL:"Referral", SCHOOL:"School", PATH:"Career path", TEAM:"Team / topic"};
+const CONN_LABEL = {referral:"referral", warm:"warm", mutual:"mutual contact", alumni:"alumni", employer:"same past employer", nordic:"Nordic link", cold:"cold", unknown:"unknown"};
 function pitchMeta(p){
   if (!p.subjectFamily && !p.connectionType) return "";
-  const bits = [p.subjectFamily ? "Emne: " + (FAM_LABEL[p.subjectFamily] || p.subjectFamily) : "", p.connectionType ? "Kobling: " + (CONN_LABEL[p.connectionType] || p.connectionType) : "", p.variant ? "Test " + p.variant : "", p.question ? "Spørsmål: " + p.question : ""].filter(Boolean);
+  const bits = [p.subjectFamily ? "Subject: " + (FAM_LABEL[p.subjectFamily] || p.subjectFamily) : "", p.connectionType ? "Connection: " + (CONN_LABEL[p.connectionType] || p.connectionType) : "", p.variant ? "Test " + p.variant : "", p.question ? "Question: " + p.question : ""].filter(Boolean);
   return `<div class="pitch-meta">${bits.map(b => `<span>${esc(b)}</span>`).join("")}</div>`;
 }
 /* ---------- relevance: a few visible rules, no fake precision ---------- */
