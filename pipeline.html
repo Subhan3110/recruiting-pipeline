@@ -817,6 +817,21 @@ input,select,textarea{border-radius:10px}
 .dupnote{font-size:12px;color:var(--s-bad);margin:0 0 8px}
 .dup{flex:none;font-family:var(--mono);font-size:9px;text-transform:uppercase;color:var(--s-bad);margin-left:6px}
 .btn.dnc{color:var(--s-bad)}
+.dupnote .btn{margin-left:6px;padding:2px 8px;font-size:11.5px}
+.mergenote{font-size:12px;color:var(--muted);margin:0 0 8px}
+.dups{display:grid;gap:12px;margin-top:12px}
+.dpair{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.dpair.unsure{border-style:dashed}
+.dp-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.dp-how{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--s-int);border:1px solid currentColor;border-radius:5px;padding:1px 6px}
+.dp-warn{font-size:12px;color:var(--s-bad)}
+.dp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px}
+.dp-l{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.dp-rec{display:flex;flex-direction:column;gap:2px;font-size:13px;min-width:0}
+.dp-rec span{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.dp-mono{font-family:var(--mono)}
+.dp-diff{font-size:12px;color:var(--muted);margin:8px 0 0;overflow-wrap:anywhere}
+.dpair .acts{margin-top:10px}
 .queue-box .tri-head{flex-wrap:wrap;gap:12px}
 .q-stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px;color:var(--muted)}
 .q-stats b{font-size:15px;color:var(--ink,inherit);margin-right:3px}
@@ -927,6 +942,11 @@ input,select,textarea{border-radius:10px}
     <div class="panel-box queue-box" id="queue-box">
       <div class="tri-head"><div><h2>Who should I contact today?</h2><p class="tri-meta" id="q-meta"></p></div><div class="q-stats" id="q-stats"></div></div>
       <div class="ilist" id="queue"></div>
+    </div>
+    <div class="panel-box dup-box" id="dup-box" hidden>
+      <div class="tri-head"><div><h2>Possible duplicates <span class="tag" id="dup-n"></span></h2>
+        <p class="tri-meta">Merging keeps the record with history, fills its empty fields from the other one and saves anything that differs in its merge history. Undo is offered right after.</p></div></div>
+      <div class="dups" id="dups"></div>
     </div>
     <div class="kpis">
       <div class="kpi"><span class="n" id="k-out">0</span><span class="l">Total outreach</span></div>
@@ -1758,7 +1778,7 @@ function renderQueue(){
     : `<p class="empty-note">Nobody waiting. The morning search adds new people every day.</p>`;
 }
 function renderOverview(){
-  renderQueue(); renderLearning();
+  renderQueue(); renderDups(); renderLearning();
   const O = state.outreach, A = state.applications, LI = ofCh("LinkedIn"), EM = ofCh("Email");
   const triItems = [...(tri.li.data?.items || []).map(i => ({...i, ch:"LinkedIn"})), ...(tri.em.data?.items || []).map(i => ({...i, ch:"Email"}))];
   $("k-out").textContent = O.length; $("k-reply").textContent = rate(O);
@@ -1909,7 +1929,7 @@ function renderTable(v){
   } else {
     head.innerHTML = `<tr><th>Person</th><th>${v === "email" ? "Address" : "Referred by"}</th><th>Status</th><th>Sent</th><th>Waiting</th><th>Notes</th><th></th></tr>`;
     body.innerHTML = rows.length ? rows.map(r => { const d = r.status === "Sent" ? days(r.sent) : null; return `<tr>
-      <td class="who">${personAvatar(r.name)}<strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))} · ${esc(personCountry(r).flag)} ${esc(personCountry(r).name)}</small>${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
+      <td class="who">${personAvatar(r.name)}<strong>${esc(r.name)}</strong><small>${esc([r.title,r.firm].filter(Boolean).join(", "))} · ${esc(personCountry(r).flag)} ${esc(personCountry(r).name)}</small>${(r.mergeHistory || []).length ? `<span class="tag" title="${esc("Merged from " + r.mergeHistory.map(e => e.name + (e.firm ? ", " + e.firm : "") + " (" + String(e.at).slice(0,10) + ")").join("; "))}">merged</span>` : ""}${appsFor(r).length ? `<span class="tag warm" title="${esc(appsFor(r).map(a => a.company + ": " + (a.role || "") + " (" + a.status + ")").join("\n"))}">${appsFor(r).length} app${appsFor(r).length > 1 ? "s" : ""}</span>` : ""}</td>
       <td>${v === "email" ? (r.address ? `<span style="font-family:var(--mono);font-size:12px">${esc(r.address)}</span>` : dash) : (r.via ? esc(r.via) : dash)}</td>
       <td>${pill(r)}</td><td class="num">${fmt(r.sent) || dash}</td>
       <td class="num ${d >= 7 ? "overdue" : ""}">${d != null ? d + "d" : dash}</td>
@@ -1919,6 +1939,7 @@ function renderTable(v){
 
 function render(){
   drafts.clear();
+  DUPS = dupPairs();
   renderStats();
   if (view === "overview") renderOverview();
   else if (view === "profile") renderProfile();
@@ -2264,11 +2285,134 @@ function samePerson(a, b){
   if (ua && ua === ub) return true;
   return !!(nameKey(a.name) && nameKey(a.name) === nameKey(b.name) && (firmMatch(a.firm, b.firm) || norm(a.firm) === norm(b.firm)));
 }
+/* ---------- duplicate pairs and safe merging ----------
+   Sure match: same email, same profile link, or same name at the same firm.
+   Check match: same name at a different firm (they may have moved), never merged without a click.
+   The record with history wins: an outreach row beats a prospect, the older record beats the newer. */
+function matchHow(a, b){
+  const ea = normEmail(a.emailGuess || a.address), eb = normEmail(b.emailGuess || b.address), aa = normEmail(a.emailAlt), ab = normEmail(b.emailAlt);
+  if ((ea && (ea === eb || ea === ab)) || (eb && eb === aa)) return "same email";
+  const ua = normUrl(a.profileUrl || a.profile), ub = normUrl(b.profileUrl || b.profile);
+  if (ua && ua === ub) return "same profile link";
+  if (!nameKey(a.name) || nameKey(a.name) !== nameKey(b.name)) return "";
+  return firmMatch(a.firm, b.firm) || norm(a.firm) === norm(b.firm) ? "same name and firm" : "same name, different firm";
+}
+const O_RANK = {"Drafted":0, "Sent":1, "No reply":2, "Replied":3, "Declined":3, "Call booked":4, "Call done":5, "Do not contact":9};
+const P_RANK = {"New":0, "Skipped":1, "Contacted":2, "Do not contact":9};
+const recAge = x => String(x.rec.sent || x.rec.foundAt || x.rec.updated || "9999");
+function chooseKeeper(a, b){
+  if (a.col !== b.col) return a.col === "outreach" ? [a, b] : [b, a];
+  const ra = a.col === "outreach" ? (O_RANK[a.rec.status] ?? 0) : (P_RANK[a.rec.status || "New"] ?? 0);
+  const rb = b.col === "outreach" ? (O_RANK[b.rec.status] ?? 0) : (P_RANK[b.rec.status || "New"] ?? 0);
+  if (ra !== rb) return ra > rb ? [a, b] : [b, a];
+  return recAge(a) <= recAge(b) ? [a, b] : [b, a];
+}
+let DUPS = [];
+function dupPairs(){
+  const recs = [...state.outreach.map(r => ({col:"outreach", rec:r})), ...prospects.filter(p => p.status !== "Merged").map(p => ({col:"prospects", rec:p}))];
+  const out = [];
+  for (let i = 0; i < recs.length; i++) for (let j = i + 1; j < recs.length; j++){
+    const a = recs[i], b = recs[j];
+    const open = x => x.col === "prospects" && (x.rec.status || "New") === "New";
+    if (a.col === "prospects" && b.col === "prospects" && !open(a) && !open(b)) continue;
+    if (a.col !== b.col && !open(a.col === "prospects" ? a : b)) continue;  /* a contacted prospect and its outreach row are one person's history, not a duplicate */
+    if (a.col === "outreach" && b.col === "outreach" && (a.rec.channel || "LinkedIn") !== (b.rec.channel || "LinkedIn")) continue;  /* same person on two channels is fine */
+    const how = matchHow(a.rec, b.rec); if (!how) continue;
+    const key = [a.col + "/" + a.rec.id, b.col + "/" + b.rec.id].sort().join("|");
+    if (dismissed["dup:" + key]) continue;
+    const [keep, drop] = (dupSwap.has(key) ? chooseKeeper(a, b).reverse() : chooseKeeper(a, b));
+    out.push({key, how, sure: how !== "same name, different firm", keep, drop});
+  }
+  return out;
+}
+const dupSwap = new Set();
 function dupOf(p){
-  const o = state.outreach.find(r => r.id === p.id || samePerson(p, r));
-  if (o) return {where:"Outreach", r:o, text:`Already in ${o.channel || "LinkedIn"} outreach as ${o.status}${o.sent ? " (" + fmt(o.sent) + ")" : ""}`};
-  const q = prospects.find(x => x.id !== p.id && (String(x.foundAt || "") < String(p.foundAt || "") || (x.foundAt === p.foundAt && x.id < p.id)) && samePerson(p, x));
-  return q ? {where:"Prospects", r:q, text:`Also listed as ${q.name}, ${q.firm || ""} (${q.status || "New"})`} : null;
+  const x = DUPS.find(d => d.sure && d.drop.col === "prospects" && d.drop.rec.id === p.id);
+  if (!x) return null;
+  const k = x.keep.rec;
+  return {pair:x, text: x.keep.col === "outreach" ? `already in ${k.channel || "LinkedIn"} outreach as ${k.status}${k.sent ? " (" + fmt(k.sent) + ")" : ""}` : `also listed as ${k.name}, ${k.firm || ""} (${k.status || "New"})`};
+}
+const MERGE_SKIP = new Set(["id","status","foundAt","kind","mergeHistory","mergedInto","relevance","contactedAt","updated","sent","followedUp","lastContact","doNotContact"]);
+const blank = v => v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length);
+function mergePatch(keep, drop, how){
+  const k = keep.rec, d = drop.rec, patch = {}, conflicts = {};
+  const moved = how === "same name, different firm";  /* they changed job: the newer record has the current firm and title */
+  for (const [f, v] of Object.entries(d)){
+    if (MERGE_SKIP.has(f) || blank(v)) continue;
+    if (blank(k[f])) patch[f] = v;
+    else if (JSON.stringify(k[f]) !== JSON.stringify(v)){
+      if (moved && ["firm","title","location","country"].includes(f)){ patch[f] = v; conflicts["previous " + f] = k[f]; }
+      else conflicts[f] = v;
+    }
+  }
+  if (keep.col === "outreach" && drop.col === "prospects" && blank(k.profile) && d.profileUrl) patch.profile = d.profileUrl;
+  const altEmail = conflicts.emailGuess || conflicts.address;
+  if (altEmail && blank(k.emailAlt) && normEmail(altEmail) !== normEmail(k.emailGuess || k.address)) patch.emailAlt = altEmail;
+  if (keep.col === "outreach" && drop.col === "outreach"){
+    if ((O_RANK[d.status] ?? 0) > (O_RANK[k.status] ?? 0)) patch.status = d.status;
+    if (d.sent && (!k.sent || d.sent < k.sent)) patch.sent = d.sent;
+    const lc = [k.lastContact, d.lastContact, k.followedUp, d.followedUp].filter(Boolean).sort().pop(); if (lc && lc !== k.lastContact) patch.lastContact = lc;
+    if (d.notes && k.notes && d.notes !== k.notes) patch.notes = k.notes + " | " + d.notes;
+  }
+  if (keep.col === "prospects" && drop.col === "prospects" && (P_RANK[d.status || "New"] ?? 0) > (P_RANK[k.status || "New"] ?? 0)){ patch.status = d.status; if (d.contactedAt) patch.contactedAt = d.contactedAt; }
+  if (d.status === DNC || d.doNotContact){ patch.doNotContact = true; patch.status = DNC; }
+  const snap = {...d}; delete snap.id;
+  patch.mergeHistory = [...(k.mergeHistory || []), {at: new Date().toISOString(), from: drop.col + "/" + d.id, name: d.name || "", firm: d.firm || "", status: d.status || "", conflicts, ...(drop.col === "outreach" ? {snapshot: snap} : {})}];
+  return patch;
+}
+async function mergePair(key){
+  const x = DUPS.find(d => d.key === key); if (!x) return;
+  const {keep, drop} = x, kSnap = {...keep.rec}, dSnap = {...drop.rec};
+  const patch = mergePatch(keep, drop, x.how);
+  const kList = keep.col === "outreach" ? state.outreach : prospects;
+  Object.assign(kList.find(r => r.id === keep.rec.id) || {}, patch);
+  if (drop.col === "prospects"){ const p = prospects.find(r => r.id === drop.rec.id); if (p){ p.status = "Merged"; p.mergedInto = keep.col + "/" + keep.rec.id; } }
+  else state.outreach = state.outreach.filter(r => r.id !== drop.rec.id);
+  render();
+  showToast(`Merged ${drop.rec.name} into ${keep.rec.name}`, () => undoMerge(keep, drop, kSnap, dSnap));
+  if (!db) return;
+  try {
+    await db.collection(keep.col).doc(keep.rec.id).update(patch);
+    if (drop.col === "prospects") await db.collection("prospects").doc(drop.rec.id).update({status: "Merged", mergedInto: keep.col + "/" + keep.rec.id});
+    else await db.collection("outreach").doc(drop.rec.id).delete();
+  } catch(e){ setSave(false, "Merge not saved, try again"); }
+}
+async function undoMerge(keep, drop, kSnap, dSnap){
+  const strip = o => { const c = {...o}; delete c.id; return c; };
+  const kList = keep.col === "outreach" ? state.outreach : prospects;
+  const i = kList.findIndex(r => r.id === kSnap.id); if (i >= 0) kList[i] = {...kSnap};
+  if (drop.col === "prospects"){ const j = prospects.findIndex(r => r.id === dSnap.id); if (j >= 0) prospects[j] = {...dSnap}; }
+  else if (!state.outreach.some(r => r.id === dSnap.id)) state.outreach.push({...dSnap});
+  render();
+  if (!db) return;
+  try {
+    await db.collection(keep.col).doc(kSnap.id).set(strip(kSnap));
+    await db.collection(drop.col).doc(dSnap.id).set(strip(dSnap));
+  } catch(e){ setSave(false, "Undo not saved, try again"); }
+}
+function notSamePerson(key){
+  dismissed = {...dismissed, ["dup:" + key]: today0()}; render();
+  if (db) db.doc("triage/dismissed").set({items: dismissed}).catch(() => setSave(false, "Not saved, try again"));
+}
+const recLine = x => { const r = x.rec;
+  const where = x.col === "outreach" ? `${r.channel || "LinkedIn"} outreach · ${r.status || ""}${r.sent ? " · sent " + fmt(r.sent) : ""}` : `Prospect · ${r.status || "New"}${r.foundAt ? " · found " + fmt(String(r.foundAt).slice(0,10)) : ""}`;
+  return `<div class="dp-rec"><strong>${esc(r.name)}</strong><span>${esc([r.title, r.firm].filter(Boolean).join(", "))}</span><span class="dp-where">${esc(where)}</span>${(r.emailGuess || r.address) ? `<span class="dp-mono">${esc(r.address || r.emailGuess)}</span>` : ""}</div>`; };
+function pairCard(x){
+  const diffs = Object.entries(mergePatch(x.keep, x.drop, x.how).mergeHistory.slice(-1)[0].conflicts).filter(([f]) => !/draft|body|why|hook|question|angle|gist|subject|pattern|source/i.test(f)).slice(0, 4);
+  return `<div class="dpair${x.sure ? "" : " unsure"}"><div class="dp-h"><span class="dp-how">${esc(x.how)}</span>${x.sure ? "" : '<span class="dp-warn">Check before merging: they may have changed firm</span>'}</div>
+    <div class="dp-grid"><div><span class="dp-l">Keep</span>${recLine(x.keep)}</div><div><span class="dp-l">Merge in</span>${recLine(x.drop)}</div></div>
+    ${diffs.length ? `<p class="dp-diff">${x.sure ? "Different values. Keeping the left one, saving these in history:" : "If merged, firm and title update to the newer record. Saved in history:"} ${diffs.map(([f, v]) => `${esc(f)} "${esc(String(Array.isArray(v) ? v.join(", ") : v).slice(0, 40))}"`).join(" · ")}</p>` : ""}
+    <div class="acts"><button class="btn primary" data-merge="${esc(x.key)}">Merge</button>${x.keep.col === x.drop.col ? `<button class="btn" data-dupswap="${esc(x.key)}">Keep the other one</button>` : ""}<button class="btn" data-notdup="${esc(x.key)}">Not the same person</button></div></div>`;
+}
+function renderDups(){
+  const box = $("dup-box"); if (!box) return;
+  box.hidden = !DUPS.length;
+  $("dup-n").textContent = DUPS.length + (DUPS.length === 1 ? " pair" : " pairs");
+  $("dups").innerHTML = DUPS.map(pairCard).join("");
+}
+function mergeNote(r){
+  const h = r.mergeHistory || []; if (!h.length) return "";
+  return `<p class="mergenote">Merged from ${h.map(e => esc(e.name + (e.firm ? ", " + e.firm : "")) + " (" + esc(fmt(String(e.at).slice(0,10))) + ")").join("; ")}</p>`;
 }
 const DNC = "Do not contact";
 function isDNC(name, email){
@@ -2302,7 +2446,10 @@ async function downloadBackup(kind){
   try { await dl.save(file); note.textContent = "Saved " + file.filename; }
   catch(e){ note.textContent = e?.code === "cancelled" || e?.code === "declined" ? "Not saved." : "Could not save the file."; }
 }
-function dupNote(p){ const d = dupOf(p); return d ? `<p class="dupnote">Possible duplicate: ${esc(d.text)}. Skip this one if it is the same person.</p>` : ""; }
+function dupNote(p){
+  const d = dupOf(p); if (!d) return "";
+  return `<div class="dupnote">Duplicate: ${esc(d.text)}. <button class="btn" data-merge="${esc(d.pair.key)}">Merge</button><button class="btn" data-notdup="${esc(d.pair.key)}">Not the same person</button></div>`;
+}
 /* one body for a person, whichever list shows them: research, relevance, contact info and the next action in one place */
 function channelFor(p){
   if (p.emailOnly) return "Email";
@@ -2312,7 +2459,7 @@ function channelFor(p){
 function prospectBody(p, ch){
   const email = ch === "Email";
   const acts = `<div class="acts">${p.sourceUrl ? `<a class="btn" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener">Source</a>` : ""}${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}${email ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button>` : `<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button>`}<button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button><button class="btn dnc" data-pact="dnc" data-pid="${p.id}">Do not contact</button></div>`;
-  const left = `<p class="gist">${esc(p.why || "")}${p.location ? " · " + esc(p.location) : ""}</p>${relWhy(p)}${dupNote(p)}${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}${acts}`;
+  const left = `<p class="gist">${esc(p.why || "")}${p.location ? " · " + esc(p.location) : ""}</p>${relWhy(p)}${dupNote(p)}${mergeNote(p)}${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}${acts}`;
   const right = email ? draftBox("Cold email", p.emailBody, p.emailSubject, p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)
     : p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft);
   return split(left, right);
@@ -2325,7 +2472,7 @@ function renderProspects(){
       `<strong>${relBadge(p)}<span class="nm">${esc(p.name)}</span>${countryChip(p)}${p.connected ? '<span class="conn" title="Already connected on LinkedIn" aria-label="Connected">✓</span>' : ""}${dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${emailStatus(p).cls}">@</span>` : ""}`,
       prospectBody(p, "LinkedIn"), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
-  $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New"), "li");
+  $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New" && p.status !== "Merged"), "li");
   const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
       `<strong>${p.kind === "p" ? relBadge(p) : ""}<span class="nm">${esc(p.name)}</span>${countryChip(p)}${p.kind === "p" && dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${emailStatus(p).cls}">${emailStatus(p).label}</span>`,
@@ -2333,7 +2480,7 @@ function renderProspects(){
       split(`${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}
        <div class="acts"><button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button></div>`, draftBox("Cold email", p.emailBody, p.emailSubject, null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and says how sure it is: Verified, Strong, Probable or Unknown.</p>`;
-  $("pros-em").innerHTML += doneList(prospects.filter(p => (p.emailGuess || p.emailBody) && p.status && p.status !== "New"), "em");
+  $("pros-em").innerHTML += doneList(prospects.filter(p => (p.emailGuess || p.emailBody) && p.status && p.status !== "New" && p.status !== "Merged"), "em");
 }
 /* people already contacted or skipped: kept so the address and draft are never lost */
 function doneList(list, k){
@@ -2395,6 +2542,9 @@ document.addEventListener("click", async e => {
   else if (t.dataset.tsel){ const [k,b] = t.dataset.tsel.split(":"); triSel[k] = b; render(); }
   else if (t.dataset.pact) prospectAction(t.dataset.pact, t.dataset.pid);
   else if (t.dataset.rel){ e.preventDefault(); e.stopPropagation(); cycleRel(t.dataset.rel); }
+  else if (t.dataset.merge) mergePair(t.dataset.merge);
+  else if (t.dataset.notdup) notSamePerson(t.dataset.notdup);
+  else if (t.dataset.dupswap){ const k = t.dataset.dupswap; dupSwap.has(k) ? dupSwap.delete(k) : dupSwap.add(k); render(); }
   else if (t.dataset.backup) downloadBackup(t.dataset.backup);
   else if (t.dataset.oact) write("outreach", t.dataset.pid, {address: state.outreach.find(r => r.id === t.dataset.pid)?.emailGuess || ""});
   else if (t.dataset.copy || t.dataset.copytext !== undefined){
