@@ -811,6 +811,8 @@ input,select,textarea{border-radius:10px}
 .rel{flex:none;font:inherit;font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:2px 6px;margin-right:8px;border:1px solid currentColor;background:transparent;cursor:pointer;line-height:1.3}
 .rel-H{color:var(--s-good)} .rel-M{color:var(--s-int)} .rel-L{color:var(--muted)}
 .rel:hover{background:var(--soft)}
+.it summary strong .nm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.firm-i{display:none;flex:0 1 auto;min-width:0;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:8px;font-weight:500;font-size:12px;color:var(--muted);padding:1px 7px;border-radius:999px;background:var(--soft)}
 .why-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px}
 .why-chips span{font-size:11.5px;border-radius:6px;padding:2px 8px;background:var(--soft);color:var(--muted)}
 .why-chips span.ok{color:var(--s-good)} .why-chips span.neg{color:var(--s-bad)}
@@ -837,6 +839,8 @@ input,select,textarea{border-radius:10px}
 .q-stats b{font-size:15px;color:var(--ink,inherit);margin-right:3px}
 .queue-box .ilist{margin-top:12px}
 @media (max-width:560px){#queue .it summary .tag{display:none}.q-stats{gap:4px 14px}}
+@media (max-width:560px){.firm-i{display:inline-block}.it summary{padding-right:40px}}
+.m-firm{font-weight:600;color:var(--ink,inherit)}
 .pitch-meta{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}
 .pitch-meta span{font-size:11px;color:var(--muted);background:var(--soft);border-radius:6px;padding:2px 7px}
 .learn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px}
@@ -1774,7 +1778,7 @@ function renderQueue(){
   $("q-meta").textContent = all.length ? `${all.length} ${all.length === 1 ? "person" : "people"} ready, ${hi} high relevance. Best first. Click a relevance badge to change it.` : "";
   $("queue").innerHTML = list.length ? list.map(p => { const r = relevance(p), ch = channelFor(p);
     return item("q:" + p.id,
-      `<strong>${relBadge(p)}<span class="nm">${esc(p.name)}</span>${countryChip(p)}</strong><span class="m">${esc([p.title, p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(r.reasons.length ? "Why: " + r.reasons.join(" · ") : (p.why || ""))}</span><span class="tag">${ch === "Email" ? "Email · " + emailStatus(p).label : "LinkedIn"}</span>`,
+      `<strong>${relBadge(p)}<span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}</strong><span class="m">${firmTitle(p.firm, p.title)}</span><span class="g">${esc(r.reasons.length ? "Why: " + r.reasons.join(" · ") : (p.why || ""))}</span><span class="tag">${ch === "Email" ? "Email · " + emailStatus(p).label : "LinkedIn"}</span>`,
       prospectBody(p, ch), "p:" + p.id); }).join("")
     : `<p class="empty-note">Nobody waiting. The morning search adds new people every day.</p>`;
 }
@@ -1810,6 +1814,23 @@ function mailBtn(r, big){
     : `<a class="mail" href="${esc(r.emailUrl)}" target="_blank" rel="noopener" title="${esc(r.emailLabel || "Open the email in Gmail")}">✉ email</a>`;
 }
 function triKey(i){ return i.ch + ":" + i.bucket + ":" + nameKey(i.name); }
+/* Removing an item hides that conversation for good, whatever bucket or name spelling the next check gives it.
+   It only comes back when there is a newer message than the day you removed it. */
+function dismissKey(i){
+  if (i.threadId) return "thr:" + i.threadId;
+  if (i.threadUrl) return "thr:" + normUrl(i.threadUrl);
+  return "per:" + i.ch + ":" + nameKey(i.name);
+}
+function triDismissedAt(i){
+  const nk = nameKey(i.name), first = nk.slice(0, 4);
+  const dates = [dismissed[dismissKey(i)], dismissed["per:" + i.ch + ":" + nk]];
+  for (const [k, d] of Object.entries(dismissed)){
+    const m = k.match(/^(LinkedIn|Email):[a-z]+:(.+)$/);  /* older keys: channel:bucket:name */
+    if (m && m[1] === i.ch && (m[2] === nk || (first.length === 4 && m[2].length >= 4 && (m[2].startsWith(nk) || nk.startsWith(m[2]))))) dates.push(d);
+  }
+  return dates.filter(Boolean).sort().pop() || null;
+}
+const triHidden = i => { const d = triDismissedAt(i); return !!d && !(String(i.lastDate || "") > d); };
 function doneTag(key){ return doneMap[key] ? `<span class="tag ok">Sent ${fmt(doneMap[key])}</span>` : ""; }
 const triMap = new Map();
 function triBody(i){
@@ -1819,7 +1840,7 @@ function triBody(i){
     draftBox("Draft", i.draft, i.subject, {key, channel: i.ch, name: i.name, firm: i.firm, threadUrl: i.threadUrl, emailUrl: i.emailUrl, threadId: i.threadId || "", profileUrl: (state.outreach.find(r => nameKey(r.name) === nameKey(i.name)) || {}).profile}));
 }
 function renderToday(triItems){
-  const open = triItems.filter(i => !doneMap[triKey(i)] && !dismissed[triKey(i)]);
+  const open = triItems.filter(i => !doneMap[triKey(i)] && !triHidden(i));
   const testsLive = state.applications.filter(r => !dismissed["dl:" + r.id] && (r.status === "Online test" || r.status === "HireVue") && !/\b(completed|submitted|done)\b/i.test(r.notes || ""));
   const dl = testsLive.map(r => {
     const d = r.deadline ? -days(r.deadline) : null, passed = /deadline passed/i.test(r.notes || "") || (d != null && d < 0);
@@ -1829,7 +1850,7 @@ function renderToday(triItems){
   const fuRows = state.outreach.filter(overdue).filter(r => !fuNames.has(nameKey(r.name)) && !dismissed["fu:" + r.id]);
   const warm = state.applications.filter(a => ["Applied","Online test","HireVue","Interview"].includes(a.status))
     .filter(a => !dismissed["w:" + a.id]).map(a => ({a, c: contactsFor(a).filter(o => ["Replied","Call booked","Call done"].includes(o.status))})).filter(x => x.c.length);
-  const triRow = i => item("t:" + triKey(i), `<strong>${esc(i.name)}<span class="tag">${esc(i.ch)}</span></strong><span class="m">${esc(i.firm || "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${fmt(i.lastDate)}</span>`, triBody(i), "d:" + triKey(i));
+  const triRow = i => item("t:" + triKey(i), `<strong><span class="nm">${esc(i.name)}</span>${firmTag(i.firm)}<span class="tag">${esc(i.ch)}</span></strong><span class="m">${firmTitle(i.firm, "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${fmt(i.lastDate)}</span>`, triBody(i), "d:" + dismissKey(i));
   const groups = [
     ["dl","Deadlines","Tests and HireVues not yet completed","--s-bad", dl.map(x => item("dl:" + x.r.id,
       `<strong>${esc(x.r.company)}</strong><span class="m">${esc(x.r.status)}</span><span class="g">${esc(x.r.role || "")}</span><span class="d ${x.passed || (x.d != null && x.d <= 3) ? "hot" : ""}">${x.label}</span>`,
@@ -2165,11 +2186,11 @@ function renderTriage(k){
   const cats = [...BUCKETS, ["none","No action","Friends, ads, closed","--s-cold"]];
   if (!triInit[k]){ triInit[k] = true; const first = cats.find(([b]) => b !== "none" && items.some(i => i.bucket === b)); if (first) openKeys.add("cat:" + k + ":" + first[0]); }
   $("tri-groups-" + k).innerHTML = `<div class="stack">${cats.map(([b,label,sub,c]) => {
-    const ch = k === "li" ? "LinkedIn" : "Email", list = items.filter(i => i.bucket === b && !dismissed[triKey({...i, ch})]), key = "cat:" + k + ":" + b;
+    const ch = k === "li" ? "LinkedIn" : "Email", list = items.filter(i => i.bucket === b && !triHidden({...i, ch})), key = "cat:" + k + ":" + b;
     return `<details class="cat" data-key="${key}" style="--c:var(${c})"${openKeys.has(key) ? " open" : ""}${list.length ? "" : " data-empty"}>
       <summary><span class="cl">${label}</span><span class="cs">${sub}</span><b>${list.length}</b></summary>
-      <div class="ilist">${list.length ? list.map(i => { const ii = {...i, ch: k === "li" ? "LinkedIn" : "Email"}; return item(k + ":" + i.name, `<strong>${esc(i.name)}</strong><span class="m">${esc(i.firm || "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${doneMap[triKey(ii)] ? "Sent ✓" : fmt(i.lastDate)}</span>`,
-        triBody(ii), "d:" + triKey(ii)); }).join("") : '<p class="empty-note">Nothing here.</p>'}</div></details>`;
+      <div class="ilist">${list.length ? list.map(i => { const ii = {...i, ch: k === "li" ? "LinkedIn" : "Email"}; return item(k + ":" + i.name, `<strong><span class="nm">${esc(i.name)}</span>${firmTag(i.firm)}</strong><span class="m">${firmTitle(i.firm, "")}</span><span class="g">${esc(i.gist)}</span><span class="d">${doneMap[triKey(ii)] ? "Sent ✓" : fmt(i.lastDate)}</span>`,
+        triBody(ii), "d:" + dismissKey(ii)); }).join("") : '<p class="empty-note">Nothing here.</p>'}</div></details>`;
   }).join("")}</div>`;
 }
 const triInit = {li:false, em:false};
@@ -2245,6 +2266,8 @@ function relevance(p){
   return {level: manual ? p.relevance : auto, auto, manual, reasons, minus};
 }
 const REL_RANK = {High:0, Medium:1, Low:2};
+const firmTitle = (firm, title) => [firm ? `<b class="m-firm">${esc(String(firm).replace(/\s*\((?:last listed role|structured asset finance)\)\s*$/i, ""))}</b>` : "", title ? esc(title) : ""].filter(Boolean).join(" · ");
+const firmTag = f => f ? `<span class="firm-i" title="${esc(f)}">${esc(String(f).replace(/\s*\((?:last listed role|structured asset finance)\)\s*$/i, ""))}</span>` : "";
 function relBadge(p){
   const r = relevance(p);
   return `<button type="button" class="rel rel-${r.level[0]}" data-rel="${esc(p.id)}" title="${esc((r.manual ? "Set by you" : "Suggested") + ". Click to change.")}">${r.level}${r.manual ? " •" : ""}</button>`;
@@ -2470,13 +2493,13 @@ function renderProspects(){
   const open = prospects.filter(p => (p.status || "New") === "New").sort(byRelevance);
   const openLi = open.filter(p => !p.emailOnly);
   $("pros-li").innerHTML = openLi.length ? openLi.map(p => item("p:" + p.id,
-      `<strong>${relBadge(p)}<span class="nm">${esc(p.name)}</span>${countryChip(p)}${p.connected ? '<span class="conn" title="Already connected on LinkedIn" aria-label="Connected">✓</span>' : ""}${dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${esc([p.title,p.firm].filter(Boolean).join(", "))}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${emailStatus(p).cls}">@</span>` : ""}`,
+      `<strong>${relBadge(p)}<span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}${p.connected ? '<span class="conn" title="Already connected on LinkedIn" aria-label="Connected">✓</span>' : ""}${dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${firmTitle(p.firm, p.title)}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${emailStatus(p).cls}">@</span>` : ""}`,
       prospectBody(p, "LinkedIn"), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
   $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New" && p.status !== "Merged"), "li");
   const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
-      `<strong>${p.kind === "p" ? relBadge(p) : ""}<span class="nm">${esc(p.name)}</span>${countryChip(p)}${p.kind === "p" && dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${esc(p.firm || "")}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${emailStatus(p).cls}">${emailStatus(p).label}</span>`,
+      `<strong>${p.kind === "p" ? relBadge(p) : ""}<span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}${p.kind === "p" && dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${firmTitle(p.firm, p.title)}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${emailStatus(p).cls}">${emailStatus(p).label}</span>`,
       p.kind === "p" ? prospectBody(prospects.find(x => x.id === p.id) || p, "Email") :
       split(`${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}
        <div class="acts"><button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button></div>`, draftBox("Cold email", p.emailBody, p.emailSubject, null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
@@ -2488,7 +2511,7 @@ function doneList(list, k){
   if (!list.length) return "";
   const key = "done:" + k;
   return `<details class="cat" data-key="${key}" style="--c:var(--s-cold)"${openKeys.has(key) ? " open" : ""}><summary><span class="cl">Contacted or skipped</span><span class="cs">Address and message kept here</span><b>${list.length}</b></summary><div class="ilist">${list.map(p => item("pd:" + k + ":" + p.id,
-    `<strong><span class="nm">${esc(p.name)}</span>${countryChip(p)}<span class="tag">${esc(p.status)}</span></strong><span class="m">${esc(p.firm || "")}</span><span class="g ${k === "em" ? "addr-i" : ""}">${esc(k === "em" ? (p.emailGuess || "") : (p.why || ""))}</span>`,
+    `<strong><span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}<span class="tag">${esc(p.status)}</span></strong><span class="m">${esc(p.firm || "")}</span><span class="g ${k === "em" ? "addr-i" : ""}">${esc(k === "em" ? (p.emailGuess || "") : (p.why || ""))}</span>`,
     split(`${countryEditor(p)}${k === "em" ? emailLine(p) : `<p class="gist">${esc(p.why || "")}</p>`}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn" data-pact="undo" data-pid="${p.id}">Move back to new</button></div>`,
       k === "em" ? draftBox("Cold email", p.emailBody, p.emailSubject) : draftBox(p.connected ? "Message" : "Connection note", p.liDraft)))).join("")}</div></details>`;
 }
