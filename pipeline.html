@@ -2260,6 +2260,7 @@ function relevance(p){
   const s = seniorityOf(p);
   if (/^(Analyst|Associate|VP)$/.test(s)){ reasons.push(s); pts += 1; }
   else if (/^(Director|MD)$/.test(s)) minus.push(s + ", replies less often");
+  if (p.roleConfidence === "unconfirmed") minus.push("Role only from firm page, check LinkedIn before sending");
   /* High needs the right kind of role plus a real overlap (school, past employer, referral, someone you spoke to), or many weaker signals together */
   const auto = roleFit && (strong ? pts >= 4 : pts >= 5) ? "High" : pts >= 3 ? "Medium" : "Low";
   const manual = ["High","Medium","Low"].includes(p.relevance);
