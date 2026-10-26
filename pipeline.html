@@ -841,6 +841,8 @@ input,select,textarea{border-radius:10px}
 .q-stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px;color:var(--muted)}
 .q-stats b{font-size:15px;color:var(--ink,inherit);margin-right:3px}
 .queue-box .ilist{margin-top:12px}
+.q-cc{margin-top:12px}
+.q-cc:empty{display:none}
 @media (max-width:560px){#queue .it summary .tag{display:none}.q-stats{gap:4px 14px}}
 @media (max-width:560px){.firm-i{display:inline-block}.it summary{padding-right:40px}}
 .m-firm{font-weight:600;color:var(--ink,inherit)}
@@ -949,6 +951,7 @@ input,select,textarea{border-radius:10px}
     </div>
     <div class="panel-box queue-box" id="queue-box">
       <div class="tri-head"><div><h2>Who should I contact today?</h2><p class="tri-meta" id="q-meta"></p></div><div class="q-stats" id="q-stats"></div></div>
+      <div class="doc-filter-row q-cc" id="q-countries"></div>
       <div class="ilist" id="queue"></div>
     </div>
     <div class="panel-box dup-box" id="dup-box" hidden>
@@ -1177,7 +1180,7 @@ const VIEWS = ["overview","linkedin","email","applications","profile"];
 
 let state = {applications:[], outreach:[]};
 let view = "overview", db = null, mcp = null, editing = null;
-const ui = {linkedin:{filter:null,q:""}, email:{filter:null,q:""}, applications:{filter:null,q:"",type:null}};
+const ui = {linkedin:{filter:null,q:""}, email:{filter:null,q:""}, applications:{filter:null,q:"",type:null}, queue:{}};
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const personInitials = n => String(n||"?").trim().split(/\s+/).slice(0,2).map(x=>x[0]?.toUpperCase()||"").join("");
@@ -1770,7 +1773,14 @@ function queueList(){
   return prospects.filter(p => (p.status || "New") === "New" && !p.doNotContact && !dupOf(p) && !isDNC(p.name, p.emailGuess)).sort(byRelevance);
 }
 function renderQueue(){
-  const all = queueList(), list = all.slice(0, DAILY_GOAL), t = today0();
+  const full = queueList(), t = today0();
+  const cm = new Map();
+  full.forEach(p => { const c = personCountry(p); const e = cm.get(c.name) || {k:c.name, flag:c.kind === "missing" ? "🌐" : c.flag, n:0}; e.n++; cm.set(c.name, e); });
+  if (ui.queue.firm && !cm.has(ui.queue.firm)) ui.queue.firm = "";
+  const copts = [...cm.values()].sort((a,b) => (a.k === "Country unknown") - (b.k === "Country unknown") || b.n - a.n || a.k.localeCompare(b.k));
+  $("q-countries").innerHTML = copts.length > 1 ? `<button class="chip" type="button" data-qc="" aria-pressed="${!ui.queue.firm}">🌍 All <b>${full.length}</b></button>` +
+    copts.map(o => `<button class="chip" type="button" data-qc="${esc(o.k)}" aria-pressed="${ui.queue.firm === o.k}">${esc(o.flag)} ${esc(o.k === "Country unknown" ? "Unknown" : o.k)} <b>${o.n}</b></button>`).join("") : "";
+  const all = full.filter(p => firmPass("queue", p)), list = all.slice(0, DAILY_GOAL);
   const wk = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
   const triAll = [...(tri.li.data?.items || []), ...(tri.em.data?.items || [])];
   const doneToday = state.outreach.filter(r => r.sent === t).length;
@@ -2036,6 +2046,7 @@ document.addEventListener("click", e => {
   else if (t.id === "del-yes"){ const {kind,id} = editing; closeForm(); write(kind, id, null, "delete"); }
 });
 document.addEventListener("change", e => { const s = e.target.dataset?.status; if (s) write(e.target.dataset.kind, s, {status: e.target.value}); });
+document.addEventListener("click", e => { const b = e.target.closest?.("[data-qc]"); if (!b) return; ui.queue.firm = b.dataset.qc; try { localStorage.setItem("countryFilter", JSON.stringify(Object.fromEntries(Object.keys(ui).map(k => [k, ui[k].firm || ""])))); } catch {} render(); });
 document.addEventListener("change", e => { const v = e.target.dataset?.firm; if (v && ui[v]){ ui[v].firm = e.target.value; try { localStorage.setItem("countryFilter", JSON.stringify(Object.fromEntries(Object.keys(ui).map(k => [k, ui[k].firm || ""])))); } catch {} render(); } });
 try { const ff = JSON.parse(localStorage.getItem("countryFilter") || "{}"); Object.keys(ui).forEach(k => { if (ff[k]) ui[k].firm = ff[k]; }); } catch {}
 document.addEventListener("input", e => { const v = e.target.dataset?.q; if (v){ ui[v].q = e.target.value; render(); } });
