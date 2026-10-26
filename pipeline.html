@@ -1908,19 +1908,16 @@ function tableShell(v){
 }
 document.querySelectorAll("[data-table]").forEach(el => el.innerHTML = tableShell(el.dataset.table));
 
-/* firm filter: one dropdown per tab, grouped by companyKey so "Pareto" and "Pareto Securities" are one firm */
-const firmOf = r => String(r.firm || r.company || "").trim();
-const firmK = r => { const f = firmOf(r); return f ? (companyKey(f) || norm(f)) : ""; };
+/* country filter: one dropdown per tab, by the country the person (or role) is based in */
+const firmK = r => personCountry(r).name;
 const firmPass = (v, r) => !ui[v].firm || firmK(r) === ui[v].firm;
 function firmSelect(v, list){
   const m = new Map();
-  list.forEach(r => { const k = firmK(r); if (!k) return; const e = m.get(k) || {k, names:{}, n:0}; e.n++; e.names[firmOf(r)] = (e.names[firmOf(r)] || 0) + 1; m.set(k, e); });
-  const opts = [...m.values()].map(e => ({k:e.k, n:e.n, name:Object.entries(e.names).sort((a,b) => b[1] - a[1])[0][0]}))
-    .sort((a,b) => b.n - a.n || a.name.localeCompare(b.name));
-  const cur = ui[v].firm;
-  if (cur && !m.has(cur)) ui[v].firm = "";
+  list.forEach(r => { const c = personCountry(r); const e = m.get(c.name) || {k:c.name, flag:c.kind === "missing" ? "🌐" : c.flag, n:0}; e.n++; m.set(c.name, e); });
+  const opts = [...m.values()].sort((a,b) => (a.k === "Country unknown") - (b.k === "Country unknown") || b.n - a.n || a.k.localeCompare(b.k));
+  if (ui[v].firm && !m.has(ui[v].firm)) ui[v].firm = "";
   const el = document.querySelector(`[data-firmsel="${v}"]`);
-  if (el) el.innerHTML = `<select class="firm-sel${ui[v].firm ? " on" : ""}" data-firm="${v}" aria-label="Filter by firm"><option value="">All firms · ${opts.length}</option>${opts.map(o => `<option value="${esc(o.k)}"${o.k === ui[v].firm ? " selected" : ""}>${esc(o.name)} (${o.n})</option>`).join("")}</select>`;
+  if (el) el.innerHTML = `<select class="firm-sel${ui[v].firm ? " on" : ""}" data-firm="${v}" aria-label="Filter by country"><option value="">🌍 All countries</option>${opts.map(o => `<option value="${esc(o.k)}"${o.k === ui[v].firm ? " selected" : ""}>${esc(o.flag)} ${esc(o.k)} (${o.n})</option>`).join("")}</select>`;
 }
 function renderApps(){
   const u = ui.applications, all = state.applications, q = u.q.toLowerCase();
@@ -2039,8 +2036,8 @@ document.addEventListener("click", e => {
   else if (t.id === "del-yes"){ const {kind,id} = editing; closeForm(); write(kind, id, null, "delete"); }
 });
 document.addEventListener("change", e => { const s = e.target.dataset?.status; if (s) write(e.target.dataset.kind, s, {status: e.target.value}); });
-document.addEventListener("change", e => { const v = e.target.dataset?.firm; if (v && ui[v]){ ui[v].firm = e.target.value; try { localStorage.setItem("firmFilter", JSON.stringify(Object.fromEntries(Object.keys(ui).map(k => [k, ui[k].firm || ""])))); } catch {} render(); } });
-try { const ff = JSON.parse(localStorage.getItem("firmFilter") || "{}"); Object.keys(ui).forEach(k => { if (ff[k]) ui[k].firm = ff[k]; }); } catch {}
+document.addEventListener("change", e => { const v = e.target.dataset?.firm; if (v && ui[v]){ ui[v].firm = e.target.value; try { localStorage.setItem("countryFilter", JSON.stringify(Object.fromEntries(Object.keys(ui).map(k => [k, ui[k].firm || ""])))); } catch {} render(); } });
+try { const ff = JSON.parse(localStorage.getItem("countryFilter") || "{}"); Object.keys(ui).forEach(k => { if (ff[k]) ui[k].firm = ff[k]; }); } catch {}
 document.addEventListener("input", e => { const v = e.target.dataset?.q; if (v){ ui[v].q = e.target.value; render(); } });
 $("sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeForm(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("sheet").hidden) closeForm(); });
