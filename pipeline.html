@@ -695,6 +695,9 @@ nav.top{position:sticky;top:7px;z-index:10;box-shadow:0 8px 27px rgba(43,37,92,.
 .tri-groups{gap:11px}
 .toolbar{gap:10px}
 .toolbar input[type=search]{background:var(--surface);padding:10px 13px;min-width:190px}
+.toolbar .firm-sel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:13px;font-weight:600;color:inherit;max-width:230px;cursor:pointer}
+.toolbar .firm-sel.on{border-color:var(--accent);color:var(--accent)}
+@media (max-width:640px){.toolbar .r{width:100%}.toolbar .firm-sel,.toolbar input[type=search]{flex:1 1 140px;min-width:0;max-width:none}}
 .chip{background:var(--surface);border-color:var(--line);font-weight:700;transition:transform .16s,border-color .16s}
 .chip:hover{transform:translateY(-1px);border-color:var(--accent)}
 .chip[aria-pressed=true]{background:var(--ring);border-color:var(--ring);color:var(--accent)}
@@ -1897,20 +1900,35 @@ function renderStats(){
 }
 
 function tableShell(v){
-  if (v === "applications") return `<div class="toolbar"><div class="l" data-chips="applications"></div><div class="r"><input type="search" id="q-applications" placeholder="Search" aria-label="Search" data-q="applications"><button class="btn primary" data-add="applications">Add application</button></div></div>
+  if (v === "applications") return `<div class="toolbar"><div class="l" data-chips="applications"></div><div class="r"><span data-firmsel="applications" style="display:contents"></span><input type="search" id="q-applications" placeholder="Search" aria-label="Search" data-q="applications"><button class="btn primary" data-add="applications">Add application</button></div></div>
     <div class="stack" id="apps-groups"></div>`;
   const label = v === "applications" ? "Add application" : v === "email" ? "Add email outreach" : "Add LinkedIn outreach";
-  return `<div class="toolbar"><div class="l" data-chips="${v}"></div><div class="r"><input type="search" id="q-${v}" placeholder="Search" aria-label="Search" data-q="${v}"><button class="btn primary" data-add="${v}">${label}</button></div></div>
+  return `<div class="toolbar"><div class="l" data-chips="${v}"></div><div class="r"><span data-firmsel="${v}" style="display:contents"></span><input type="search" id="q-${v}" placeholder="Search" aria-label="Search" data-q="${v}"><button class="btn primary" data-add="${v}">${label}</button></div></div>
     <div class="tablewrap"><table><thead data-head="${v}"></thead><tbody data-body="${v}"></tbody></table></div>`;
 }
 document.querySelectorAll("[data-table]").forEach(el => el.innerHTML = tableShell(el.dataset.table));
 
+/* firm filter: one dropdown per tab, grouped by companyKey so "Pareto" and "Pareto Securities" are one firm */
+const firmOf = r => String(r.firm || r.company || "").trim();
+const firmK = r => { const f = firmOf(r); return f ? (companyKey(f) || norm(f)) : ""; };
+const firmPass = (v, r) => !ui[v].firm || firmK(r) === ui[v].firm;
+function firmSelect(v, list){
+  const m = new Map();
+  list.forEach(r => { const k = firmK(r); if (!k) return; const e = m.get(k) || {k, names:{}, n:0}; e.n++; e.names[firmOf(r)] = (e.names[firmOf(r)] || 0) + 1; m.set(k, e); });
+  const opts = [...m.values()].map(e => ({k:e.k, n:e.n, name:Object.entries(e.names).sort((a,b) => b[1] - a[1])[0][0]}))
+    .sort((a,b) => b.n - a.n || a.name.localeCompare(b.name));
+  const cur = ui[v].firm;
+  if (cur && !m.has(cur)) ui[v].firm = "";
+  const el = document.querySelector(`[data-firmsel="${v}"]`);
+  if (el) el.innerHTML = `<select class="firm-sel${ui[v].firm ? " on" : ""}" data-firm="${v}" aria-label="Filter by firm"><option value="">All firms · ${opts.length}</option>${opts.map(o => `<option value="${esc(o.k)}"${o.k === ui[v].firm ? " selected" : ""}>${esc(o.name)} (${o.n})</option>`).join("")}</select>`;
+}
 function renderApps(){
   const u = ui.applications, all = state.applications, q = u.q.toLowerCase();
+  firmSelect("applications", all);
   const counts = Object.fromEntries(TYPES.map(t => [t, all.filter(r => typeOf(r) === t).length]));
   document.querySelector('[data-chips="applications"]').innerHTML = `<button class="chip" data-atype="" aria-pressed="${!u.type}">All <b>${all.length}</b></button>` +
     TYPES.filter(t => counts[t]).map(t => `<button class="chip" data-atype="${t}" aria-pressed="${u.type === t}">${t} <b>${counts[t]}</b></button>`).join("");
-  const rows = all.filter(r => (!u.type || typeOf(r) === u.type) && (!q || Object.values(r).join(" ").toLowerCase().includes(q)))
+  const rows = all.filter(r => firmPass("applications", r) && (!u.type || typeOf(r) === u.type) && (!q || Object.values(r).join(" ").toLowerCase().includes(q)))
     .sort((a,b) => String(b.applied || "").localeCompare(String(a.applied || "")));
   const pill = r => `<span class="pill" style="--c:var(${color("applications", r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="applications">${STAT.applications.map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
   const dash = '<span class="blank">–</span>';
@@ -1935,7 +1953,8 @@ function renderTable(v){
     STAT[kind].map(([s,c]) => `<button class="chip" data-v="${v}" data-f="${s}" aria-pressed="${u.filter === s}"><i class="dot" style="background:var(${c})"></i>${s}</button>`).join("");
   const base = kind === "applications" ? state.applications : ofCh(CH[v]);
   const q = u.q.toLowerCase();
-  const rows = base.filter(r => (!u.filter || r.status === u.filter) && (!q || Object.values(r).join(" ").toLowerCase().includes(q)))
+  firmSelect(v, kind === "applications" ? base : [...base, ...prospects.filter(p => (p.status || "New") !== "Merged" && (v === "email" ? (p.emailGuess || p.emailBody) : !p.emailOnly))]);
+  const rows = base.filter(r => firmPass(v, r) && (!u.filter || r.status === u.filter) && (!q || Object.values(r).join(" ").toLowerCase().includes(q)))
     .sort((a,b) => String(b.applied || b.sent || "").localeCompare(String(a.applied || a.sent || "")));
   const head = document.querySelector(`[data-head="${v}"]`), body = document.querySelector(`[data-body="${v}"]`);
   const pill = r => `<span class="pill" style="--c:var(${color(kind, r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="${kind}">${STAT[kind].map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
@@ -2020,6 +2039,8 @@ document.addEventListener("click", e => {
   else if (t.id === "del-yes"){ const {kind,id} = editing; closeForm(); write(kind, id, null, "delete"); }
 });
 document.addEventListener("change", e => { const s = e.target.dataset?.status; if (s) write(e.target.dataset.kind, s, {status: e.target.value}); });
+document.addEventListener("change", e => { const v = e.target.dataset?.firm; if (v && ui[v]){ ui[v].firm = e.target.value; try { localStorage.setItem("firmFilter", JSON.stringify(Object.fromEntries(Object.keys(ui).map(k => [k, ui[k].firm || ""])))); } catch {} render(); } });
+try { const ff = JSON.parse(localStorage.getItem("firmFilter") || "{}"); Object.keys(ui).forEach(k => { if (ff[k]) ui[k].firm = ff[k]; }); } catch {}
 document.addEventListener("input", e => { const v = e.target.dataset?.q; if (v){ ui[v].q = e.target.value; render(); } });
 $("sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeForm(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("sheet").hidden) closeForm(); });
@@ -2492,20 +2513,20 @@ function prospectBody(p, ch){
 const byRelevance = (a, b) => REL_RANK[relevance(a).level] - REL_RANK[relevance(b).level] || (!!b.connected - !!a.connected) || String(b.foundAt || "").localeCompare(String(a.foundAt || ""));
 function renderProspects(){
   const open = prospects.filter(p => (p.status || "New") === "New").sort(byRelevance);
-  const openLi = open.filter(p => !p.emailOnly);
+  const openLi = open.filter(p => !p.emailOnly && firmPass("linkedin", p));
   $("pros-li").innerHTML = openLi.length ? openLi.map(p => item("p:" + p.id,
       `<strong>${relBadge(p)}<span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}${p.connected ? '<span class="conn" title="Already connected on LinkedIn" aria-label="Connected">✓</span>' : ""}${dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${firmTitle(p.firm, p.title)}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${emailStatus(p).cls}">@</span>` : ""}`,
       prospectBody(p, "LinkedIn"), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
-  $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && p.status && p.status !== "New" && p.status !== "Merged"), "li");
-  const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))];
+  $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && firmPass("linkedin", p) && p.status && p.status !== "New" && p.status !== "Merged"), "li");
+  const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))].filter(p => firmPass("email", p));
   $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
       `<strong>${p.kind === "p" ? relBadge(p) : ""}<span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}${p.kind === "p" && dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${firmTitle(p.firm, p.title)}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${emailStatus(p).cls}">${emailStatus(p).label}</span>`,
       p.kind === "p" ? prospectBody(prospects.find(x => x.id === p.id) || p, "Email") :
       split(`${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}
        <div class="acts"><button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button></div>`, draftBox("Cold email", p.emailBody, p.emailSubject, null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and says how sure it is: Verified, Strong, Probable or Unknown.</p>`;
-  $("pros-em").innerHTML += doneList(prospects.filter(p => (p.emailGuess || p.emailBody) && p.status && p.status !== "New" && p.status !== "Merged"), "em");
+  $("pros-em").innerHTML += doneList(prospects.filter(p => (p.emailGuess || p.emailBody) && firmPass("email", p) && p.status && p.status !== "New" && p.status !== "Merged"), "em");
 }
 /* people already contacted or skipped: kept so the address and draft are never lost */
 function doneList(list, k){
