@@ -195,6 +195,7 @@ td.notes{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellips
 .tile b{font-family:var(--mono);font-size:16px;font-weight:600}
 .tile.on{background:var(--soft);border-color:var(--c)}
 .tile.on span{color:var(--ink)}
+.tile.zero{opacity:.55}
 .nx{display:grid;gap:10px;margin-bottom:4px}
 .nx-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .nx-head h3{margin:0;font:700 16px var(--display)}
@@ -1949,7 +1950,12 @@ function firmSelect(v, list){
 }
 /* what to do next on each application: one action per live stage, and stage tiles that filter the list */
 const NEXT = {"Offer":["Reply to offer","--s-good",5],"Interview":["Prepare for interview","--s-int",4],"HireVue":["Record HireVue","--s-hv",3],"Online test":["Do online test","--s-test",2],"Preparing":["Finish and submit","--s-prep",1]};
-const STAGES = [["Online test",["Online test"],"--s-test"],["HireVue",["HireVue"],"--s-hv"],["Interview",["Interview"],"--s-int"],["Offer",["Offer"],"--s-good"],["Preparing",["Preparing"],"--s-prep"],["Applied",["Applied"],"--s-sent"],["Closed",["Rejected","Withdrawn"],"--s-bad"]];
+const isTest = r => r.status === "Online test" || r.status === "HireVue";
+const ST = (...a) => r => a.includes(r.status);
+const STAGES = [["Test to do", r => r.status === "Online test" && !stepDone(r) && !testExpired(r), "--s-test", 1],["HireVue to do", r => r.status === "HireVue" && !stepDone(r) && !testExpired(r), "--s-hv", 1],
+  ["Interview", ST("Interview"), "--s-int", 1],["Offer", ST("Offer"), "--s-good", 1],["Preparing", ST("Preparing"), "--s-prep", 1],
+  ["Done, waiting", r => isTest(r) && stepDone(r), "--s-sent", 0],["Applied", ST("Applied"), "--s-sent", 0],
+  ["Expired", r => isTest(r) && !stepDone(r) && testExpired(r), "--s-cold", 0],["Closed", ST("Rejected","Withdrawn"), "--s-bad", 0]];
 const stepDone = r => r.stepDone === r.status || ((r.status === "Online test" || r.status === "HireVue") && /\b(completed|submitted|done)\b/i.test(r.notes || ""));
 /* when the test or video invite arrived: stageAt (set when the status changes here), else an ISO date next to "invite" in the notes, else "(24 Sep)" in the email label */
 const MON = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
@@ -1967,7 +1973,7 @@ const TEST_WINDOW = 7;
 const testExpired = r => { if (r.status !== "Online test" && r.status !== "HireVue") return false;
   if (r.deadline && days(r.deadline) > 0) return true;
   const inv = inviteDate(r); return !inv || days(inv) > TEST_WINDOW; };
-const stagePass = r => { const s = ui.applications.stage; if (!s) return true; const st = STAGES.find(x => x[0] === s); return st ? st[1].includes(r.status) : true; };
+const stagePass = r => { const s = ui.applications.stage; if (!s) return true; const st = STAGES.find(x => x[0] === s); return st ? st[1](r) : true; };
 function renderNext(all){
   const el = $("apps-next"); if (!el) return;
   const u = ui.applications;
@@ -1975,8 +1981,8 @@ function renderNext(all){
     .sort((a,b) => (a.deadline ? 0 : 1) - (b.deadline ? 0 : 1) || String(a.deadline || "").localeCompare(String(b.deadline || "")) || NEXT[b.status][2] - NEXT[a.status][2]);
   const due = r => { if (!r.deadline) return '<span class="nx-due">no deadline</span>'; const d = -days(r.deadline);
     return `<span class="nx-due${d <= 2 ? " hot" : ""}">${d < 0 ? "overdue " + (-d) + "d" : d === 0 ? "due today" : d === 1 ? "due tomorrow" : "due in " + d + "d"} · ${fmt(r.deadline)}</span>`; };
-  const tiles = STAGES.map(([s,st,c]) => { const n = all.filter(r => st.includes(r.status) && firmPass("applications", r)).length; const open = st.some(x => NEXT[x]) ? all.filter(r => st.includes(r.status) && NEXT[r.status] && !stepDone(r) && !testExpired(r) && firmPass("applications", r)).length : 0;
-    return `<button class="tile${u.stage === s ? " on" : ""}" type="button" data-astage="${s}" style="--c:var(${c})" title="${open ? open + " to do" : ""}"><span>${s}${open ? " ●" : ""}</span><b>${n}</b></button>`; }).join("");
+  const tiles = STAGES.map(([s,f,c,act]) => { const n = all.filter(r => f(r) && firmPass("applications", r)).length;
+    return `<button class="tile${u.stage === s ? " on" : ""}${!n ? " zero" : ""}" type="button" data-astage="${s}" style="--c:var(${c})"><span>${s}${act && n ? " ●" : ""}</span><b>${n}</b></button>`; }).join("");
   el.innerHTML = `<div class="nx-head"><h3>What to do next</h3><span>${todo.length ? todo.length + " action" + (todo.length > 1 ? "s" : "") + ", most urgent first" : "Nothing waiting on you"}${u.stage ? ` · <button class="rowbtn" data-astage="">clear filter</button>` : ""}</span></div>
     <div class="nx-tiles">${tiles}</div>
     <div class="nx-list">${todo.length ? todo.slice(0, 12).map(r => { const [lab,c] = NEXT[r.status]; return `<div class="nx-it" style="--c:var(${c})">
@@ -2000,10 +2006,14 @@ function renderApps(){
     <td>${esc(r.location || "")}</td><td>${pill(r)}</td><td class="num">${fmt(r.applied) || dash}</td>
     <td class="num ${r.deadline && -days(r.deadline) <= 3 && -days(r.deadline) >= 0 ? "overdue" : ""}">${fmt(r.deadline) || dash}</td>
     <td class="notes" title="${esc(r.notes)}">${esc(r.notes)}</td><td><button class="rowbtn" data-edit="${r.id}" data-v="applications">Edit</button></td></tr>`; };
-  const G = [["live","Live","Tests, HireVues, interviews, offers",["Online test","HireVue","Interview","Offer"],"--s-hv"],["applied","Applied","Waiting to hear back",["Applied"],"--s-sent"],
-    ["prep","Preparing","Not submitted yet",["Preparing"],"--s-prep"],["closed","Closed","Rejected or withdrawn",["Rejected","Withdrawn"],"--s-bad"]];
-  if (!appsInit && all.length){ appsInit = true; ["live","applied","prep"].forEach(k => openKeys.add("apps:" + k)); }
-  $("apps-groups").innerHTML = G.map(([k,label,sub,st,c]) => { const list = rows.filter(r => st.includes(r.status));
+  const G = [["todo","To do","Tests, HireVues, interviews and offers waiting on you", r => (isTest(r) && !stepDone(r) && !testExpired(r)) || ["Interview","Offer"].includes(r.status),"--s-hv"],
+    ["waiting","Test done, waiting","Completed tests and HireVues, waiting to hear back", r => isTest(r) && stepDone(r),"--s-sent"],
+    ["applied","Applied","Submitted, no test yet", ST("Applied"),"--s-sent"],
+    ["prep","Preparing","Not submitted yet", ST("Preparing"),"--s-prep"],
+    ["expired","Expired invites","Tests and HireVues not done within 7 days", r => isTest(r) && !stepDone(r) && testExpired(r),"--s-cold"],
+    ["closed","Closed","Rejected or withdrawn", ST("Rejected","Withdrawn"),"--s-bad"]];
+  if (!appsInit && all.length){ appsInit = true; ["todo","waiting","prep"].forEach(k => openKeys.add("apps:" + k)); }
+  $("apps-groups").innerHTML = G.map(([k,label,sub,st,c]) => { const list = rows.filter(st);
     return `<details class="cat" data-key="apps:${k}" style="--c:var(${c})"${openKeys.has("apps:" + k) ? " open" : ""}${list.length ? "" : " data-empty"}>
       <summary><span class="cl">${label}</span><span class="cs">${sub}</span><b>${list.length}</b></summary>
       ${list.length ? `<div class="tablewrap flat"><table><thead><tr><th>Firm / role</th><th>Type</th><th>Location</th><th>Status</th><th>Applied</th><th>Deadline</th><th>Notes</th><th></th></tr></thead><tbody>${list.map(tr).join("")}</tbody></table></div>` : '<p class="empty-note" style="padding:10px 12px">Nothing here.</p>'}</details>`; }).join("");
