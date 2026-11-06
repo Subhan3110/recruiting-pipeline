@@ -1872,7 +1872,7 @@ function triBody(i){
 }
 function renderToday(triItems){
   const open = triItems.filter(i => !doneMap[triKey(i)] && !triHidden(i));
-  const testsLive = state.applications.filter(r => !dismissed["dl:" + r.id] && (r.status === "Online test" || r.status === "HireVue") && !/\b(completed|submitted|done)\b/i.test(r.notes || ""));
+  const testsLive = state.applications.filter(r => !dismissed["dl:" + r.id] && (r.status === "Online test" || r.status === "HireVue") && !stepDone(r) && !testExpired(r));
   const dl = testsLive.map(r => {
     const d = r.deadline ? -days(r.deadline) : null, passed = /deadline passed/i.test(r.notes || "") || (d != null && d < 0);
     return {r, d, passed, label: passed ? "Deadline passed" : d != null ? (d === 0 ? "Due today" : "Due in " + d + "d") : "Check portal"};
@@ -1951,15 +1951,31 @@ function firmSelect(v, list){
 const NEXT = {"Offer":["Reply to offer","--s-good",5],"Interview":["Prepare for interview","--s-int",4],"HireVue":["Record HireVue","--s-hv",3],"Online test":["Do online test","--s-test",2],"Preparing":["Finish and submit","--s-prep",1]};
 const STAGES = [["Online test",["Online test"],"--s-test"],["HireVue",["HireVue"],"--s-hv"],["Interview",["Interview"],"--s-int"],["Offer",["Offer"],"--s-good"],["Preparing",["Preparing"],"--s-prep"],["Applied",["Applied"],"--s-sent"],["Closed",["Rejected","Withdrawn"],"--s-bad"]];
 const stepDone = r => r.stepDone === r.status || ((r.status === "Online test" || r.status === "HireVue") && /\b(completed|submitted|done)\b/i.test(r.notes || ""));
+/* when the test or video invite arrived: stageAt (set when the status changes here), else an ISO date next to "invite" in the notes, else "(24 Sep)" in the email label */
+const MON = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function inviteDate(r){
+  if (r.stageAt) return r.stageAt;
+  const n = String(r.notes || ""), m = n.match(/invit\w*[^.]*?(\d{4}-\d{2}-\d{2})/i) || n.match(/(\d{4}-\d{2}-\d{2})[^.]*?invit/i);
+  if (m) return m[1];
+  const l = String(r.emailLabel || "").match(/\((\d{1,2})\s+([A-Za-z]{3})/);
+  if (l && MON[l[2].toLowerCase()] !== undefined){ const t = new Date(); let d = new Date(Date.UTC(t.getFullYear(), MON[l[2].toLowerCase()], +l[1]));
+    if (d > t) d = new Date(Date.UTC(t.getFullYear() - 1, MON[l[2].toLowerCase()], +l[1])); return d.toISOString().slice(0,10); }
+  return null;
+}
+/* tests and video interviews never stay open for more than 7 days, so older invites drop off the to-do list */
+const TEST_WINDOW = 7;
+const testExpired = r => { if (r.status !== "Online test" && r.status !== "HireVue") return false;
+  if (r.deadline && days(r.deadline) > 0) return true;
+  const inv = inviteDate(r); return !inv || days(inv) > TEST_WINDOW; };
 const stagePass = r => { const s = ui.applications.stage; if (!s) return true; const st = STAGES.find(x => x[0] === s); return st ? st[1].includes(r.status) : true; };
 function renderNext(all){
   const el = $("apps-next"); if (!el) return;
   const u = ui.applications;
-  const todo = all.filter(r => NEXT[r.status] && !stepDone(r) && firmPass("applications", r) && stagePass(r))
+  const todo = all.filter(r => NEXT[r.status] && !stepDone(r) && !testExpired(r) && firmPass("applications", r) && stagePass(r))
     .sort((a,b) => (a.deadline ? 0 : 1) - (b.deadline ? 0 : 1) || String(a.deadline || "").localeCompare(String(b.deadline || "")) || NEXT[b.status][2] - NEXT[a.status][2]);
   const due = r => { if (!r.deadline) return '<span class="nx-due">no deadline</span>'; const d = -days(r.deadline);
     return `<span class="nx-due${d <= 2 ? " hot" : ""}">${d < 0 ? "overdue " + (-d) + "d" : d === 0 ? "due today" : d === 1 ? "due tomorrow" : "due in " + d + "d"} · ${fmt(r.deadline)}</span>`; };
-  const tiles = STAGES.map(([s,st,c]) => { const n = all.filter(r => st.includes(r.status) && firmPass("applications", r)).length; const open = st.some(x => NEXT[x]) ? all.filter(r => st.includes(r.status) && NEXT[r.status] && !stepDone(r) && firmPass("applications", r)).length : 0;
+  const tiles = STAGES.map(([s,st,c]) => { const n = all.filter(r => st.includes(r.status) && firmPass("applications", r)).length; const open = st.some(x => NEXT[x]) ? all.filter(r => st.includes(r.status) && NEXT[r.status] && !stepDone(r) && !testExpired(r) && firmPass("applications", r)).length : 0;
     return `<button class="tile${u.stage === s ? " on" : ""}" type="button" data-astage="${s}" style="--c:var(${c})" title="${open ? open + " to do" : ""}"><span>${s}${open ? " ●" : ""}</span><b>${n}</b></button>`; }).join("");
   el.innerHTML = `<div class="nx-head"><h3>What to do next</h3><span>${todo.length ? todo.length + " action" + (todo.length > 1 ? "s" : "") + ", most urgent first" : "Nothing waiting on you"}${u.stage ? ` · <button class="rowbtn" data-astage="">clear filter</button>` : ""}</span></div>
     <div class="nx-tiles">${tiles}</div>
@@ -1980,7 +1996,7 @@ function renderApps(){
   const pill = r => `<span class="pill" style="--c:var(${color("applications", r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="applications">${STAT.applications.map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
   const dash = '<span class="blank">–</span>';
   const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><strong>${esc(r.company)}</strong><small>${esc(r.role || "")}</small>${mailBtn(r)}</td>
-    <td><span class="tag">${typeOf(r)}</span>${NEXT[r.status] && r.status !== "Preparing" ? (stepDone(r) ? '<span class="tag ok">done, waiting</span>' : `<span class="tag" style="color:var(${NEXT[r.status][1]});border-color:currentColor">${NEXT[r.status][0].toLowerCase()}</span>`) : ""}${c.length ? `<span class="tag warm" title="${esc(c.map(o => o.name + " (" + o.status + ")").join(", "))}">${c.length} contact${c.length > 1 ? "s" : ""}</span>` : ""}</td>
+    <td><span class="tag">${typeOf(r)}</span>${NEXT[r.status] && r.status !== "Preparing" ? (stepDone(r) ? '<span class="tag ok">done, waiting</span>' : testExpired(r) ? '<span class="tag" title="Invite is more than 7 days old or past its deadline">invite expired</span>' : `<span class="tag" style="color:var(${NEXT[r.status][1]});border-color:currentColor">${NEXT[r.status][0].toLowerCase()}</span>`) : ""}${c.length ? `<span class="tag warm" title="${esc(c.map(o => o.name + " (" + o.status + ")").join(", "))}">${c.length} contact${c.length > 1 ? "s" : ""}</span>` : ""}</td>
     <td>${esc(r.location || "")}</td><td>${pill(r)}</td><td class="num">${fmt(r.applied) || dash}</td>
     <td class="num ${r.deadline && -days(r.deadline) <= 3 && -days(r.deadline) >= 0 ? "overdue" : ""}">${fmt(r.deadline) || dash}</td>
     <td class="notes" title="${esc(r.notes)}">${esc(r.notes)}</td><td><button class="rowbtn" data-edit="${r.id}" data-v="applications">Edit</button></td></tr>`; };
@@ -2042,6 +2058,7 @@ function render(){
 /* ---------- writes ---------- */
 async function write(kind, id, data, mode){
   const row = state[kind].find(r => r.id === id);
+  if (kind === "applications" && data && data.status && (!row || row.status !== data.status) && !data.stageAt) data = {...data, stageAt: today0()};
   if (mode === "delete") state[kind] = state[kind].filter(r => r.id !== id);
   else if (row) Object.assign(row, data); else state[kind].push({id, ...data});
   render();
