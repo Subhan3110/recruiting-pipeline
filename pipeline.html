@@ -195,6 +195,24 @@ td.notes{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellips
 .tile b{font-family:var(--mono);font-size:16px;font-weight:600}
 .tile.on{background:var(--soft);border-color:var(--c)}
 .tile.on span{color:var(--ink)}
+.nx{display:grid;gap:10px;margin-bottom:4px}
+.nx-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.nx-head h3{margin:0;font:700 16px var(--display)}
+.nx-head span{font-size:12px;color:var(--muted)}
+.nx-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:6px}
+.nx-list{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.nx-it{display:grid;grid-template-columns:150px minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:13px}
+.nx-it:last-child{border-bottom:0}
+.nx-do{font-weight:700;color:var(--c);display:flex;align-items:center;gap:7px;white-space:nowrap}
+.nx-do i{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.nx-it .w{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nx-it .w small{color:var(--muted);margin-left:6px}
+.nx-due{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.nx-due.hot{color:var(--s-bad);font-weight:600}
+.nx-it .acts{display:flex;gap:6px}
+.nx-it .acts .btn{padding:4px 10px;font-size:12px}
+.nx-empty{padding:12px;font-size:13px;color:var(--muted)}
+@media (max-width:640px){.nx-it{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.nx-it .w{grid-column:1/-1;order:-1}.nx-it .acts{grid-column:1/-1}}
 .ilist{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .ilist > .empty-note{padding:12px}
 .tri-sum{margin:0;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--s-hv);border-radius:6px;font-size:13px}
@@ -1910,7 +1928,7 @@ function renderStats(){
 }
 
 function tableShell(v){
-  if (v === "applications") return `<div class="toolbar"><div class="l" data-chips="applications"></div><div class="r"><span data-firmsel="applications" style="display:contents"></span><input type="search" id="q-applications" placeholder="Search" aria-label="Search" data-q="applications"><button class="btn primary" data-add="applications">Add application</button></div></div>
+  if (v === "applications") return `<div class="nx" id="apps-next"></div><div class="toolbar"><div class="l" data-chips="applications"></div><div class="r"><span data-firmsel="applications" style="display:contents"></span><input type="search" id="q-applications" placeholder="Search" aria-label="Search" data-q="applications"><button class="btn primary" data-add="applications">Add application</button></div></div>
     <div class="stack" id="apps-groups"></div>`;
   const label = v === "applications" ? "Add application" : v === "email" ? "Add email outreach" : "Add LinkedIn outreach";
   return `<div class="toolbar"><div class="l" data-chips="${v}"></div><div class="r"><span data-firmsel="${v}" style="display:contents"></span><input type="search" id="q-${v}" placeholder="Search" aria-label="Search" data-q="${v}"><button class="btn primary" data-add="${v}">${label}</button></div></div>
@@ -1929,18 +1947,40 @@ function firmSelect(v, list){
   const el = document.querySelector(`[data-firmsel="${v}"]`);
   if (el) el.innerHTML = `<select class="firm-sel${ui[v].firm ? " on" : ""}" data-firm="${v}" aria-label="Filter by country"><option value="">🌍 All countries</option>${opts.map(o => `<option value="${esc(o.k)}"${o.k === ui[v].firm ? " selected" : ""}>${esc(o.flag)} ${esc(o.k)} (${o.n})</option>`).join("")}</select>`;
 }
+/* what to do next on each application: one action per live stage, and stage tiles that filter the list */
+const NEXT = {"Offer":["Reply to offer","--s-good",5],"Interview":["Prepare for interview","--s-int",4],"HireVue":["Record HireVue","--s-hv",3],"Online test":["Do online test","--s-test",2],"Preparing":["Finish and submit","--s-prep",1]};
+const STAGES = [["Online test",["Online test"],"--s-test"],["HireVue",["HireVue"],"--s-hv"],["Interview",["Interview"],"--s-int"],["Offer",["Offer"],"--s-good"],["Preparing",["Preparing"],"--s-prep"],["Applied",["Applied"],"--s-sent"],["Closed",["Rejected","Withdrawn"],"--s-bad"]];
+const stepDone = r => r.stepDone === r.status || ((r.status === "Online test" || r.status === "HireVue") && /\b(completed|submitted|done)\b/i.test(r.notes || ""));
+const stagePass = r => { const s = ui.applications.stage; if (!s) return true; const st = STAGES.find(x => x[0] === s); return st ? st[1].includes(r.status) : true; };
+function renderNext(all){
+  const el = $("apps-next"); if (!el) return;
+  const u = ui.applications;
+  const todo = all.filter(r => NEXT[r.status] && !stepDone(r) && firmPass("applications", r) && stagePass(r))
+    .sort((a,b) => (a.deadline ? 0 : 1) - (b.deadline ? 0 : 1) || String(a.deadline || "").localeCompare(String(b.deadline || "")) || NEXT[b.status][2] - NEXT[a.status][2]);
+  const due = r => { if (!r.deadline) return '<span class="nx-due">no deadline</span>'; const d = -days(r.deadline);
+    return `<span class="nx-due${d <= 2 ? " hot" : ""}">${d < 0 ? "overdue " + (-d) + "d" : d === 0 ? "due today" : d === 1 ? "due tomorrow" : "due in " + d + "d"} · ${fmt(r.deadline)}</span>`; };
+  const tiles = STAGES.map(([s,st,c]) => { const n = all.filter(r => st.includes(r.status) && firmPass("applications", r)).length; const open = st.some(x => NEXT[x]) ? all.filter(r => st.includes(r.status) && NEXT[r.status] && !stepDone(r) && firmPass("applications", r)).length : 0;
+    return `<button class="tile${u.stage === s ? " on" : ""}" type="button" data-astage="${s}" style="--c:var(${c})" title="${open ? open + " to do" : ""}"><span>${s}${open ? " ●" : ""}</span><b>${n}</b></button>`; }).join("");
+  el.innerHTML = `<div class="nx-head"><h3>What to do next</h3><span>${todo.length ? todo.length + " action" + (todo.length > 1 ? "s" : "") + ", most urgent first" : "Nothing waiting on you"}${u.stage ? ` · <button class="rowbtn" data-astage="">clear filter</button>` : ""}</span></div>
+    <div class="nx-tiles">${tiles}</div>
+    <div class="nx-list">${todo.length ? todo.slice(0, 12).map(r => { const [lab,c] = NEXT[r.status]; return `<div class="nx-it" style="--c:var(${c})">
+      <span class="nx-do"><i></i>${lab}</span><span class="w"><strong>${esc(r.company)}</strong><small>${esc(r.role || "")}</small></span>${due(r)}
+      <span class="acts">${r.status === "Preparing" ? "" : `<button class="btn" data-stepdone="${r.id}" title="Mark this step as done; it moves to waiting">Done</button>`}<button class="btn" data-edit="${r.id}" data-v="applications">Edit</button></span></div>`; }).join("") + (todo.length > 12 ? `<p class="nx-empty">+${todo.length - 12} more below.</p>` : "")
+      : `<p class="nx-empty">${u.stage ? "Nothing to do in this stage." : "No tests, HireVues or interviews waiting. Nice."}</p>`}</div>`;
+}
 function renderApps(){
   const u = ui.applications, all = state.applications, q = u.q.toLowerCase();
   firmSelect("applications", all);
+  renderNext(all);
   const counts = Object.fromEntries(TYPES.map(t => [t, all.filter(r => typeOf(r) === t).length]));
   document.querySelector('[data-chips="applications"]').innerHTML = `<button class="chip" data-atype="" aria-pressed="${!u.type}">All <b>${all.length}</b></button>` +
     TYPES.filter(t => counts[t]).map(t => `<button class="chip" data-atype="${t}" aria-pressed="${u.type === t}">${t} <b>${counts[t]}</b></button>`).join("");
-  const rows = all.filter(r => firmPass("applications", r) && (!u.type || typeOf(r) === u.type) && (!q || Object.values(r).join(" ").toLowerCase().includes(q)))
+  const rows = all.filter(r => firmPass("applications", r) && stagePass(r) && (!u.type || typeOf(r) === u.type) && (!q || Object.values(r).join(" ").toLowerCase().includes(q)))
     .sort((a,b) => String(b.applied || "").localeCompare(String(a.applied || "")));
   const pill = r => `<span class="pill" style="--c:var(${color("applications", r.status)})"><select aria-label="Status" data-status="${r.id}" data-kind="applications">${STAT.applications.map(([s]) => `<option${s === r.status ? " selected" : ""}>${s}</option>`).join("")}</select></span>`;
   const dash = '<span class="blank">–</span>';
   const tr = r => { const c = contactsFor(r); return `<tr><td class="who"><strong>${esc(r.company)}</strong><small>${esc(r.role || "")}</small>${mailBtn(r)}</td>
-    <td><span class="tag">${typeOf(r)}</span>${c.length ? `<span class="tag warm" title="${esc(c.map(o => o.name + " (" + o.status + ")").join(", "))}">${c.length} contact${c.length > 1 ? "s" : ""}</span>` : ""}</td>
+    <td><span class="tag">${typeOf(r)}</span>${NEXT[r.status] && r.status !== "Preparing" ? (stepDone(r) ? '<span class="tag ok">done, waiting</span>' : `<span class="tag" style="color:var(${NEXT[r.status][1]});border-color:currentColor">${NEXT[r.status][0].toLowerCase()}</span>`) : ""}${c.length ? `<span class="tag warm" title="${esc(c.map(o => o.name + " (" + o.status + ")").join(", "))}">${c.length} contact${c.length > 1 ? "s" : ""}</span>` : ""}</td>
     <td>${esc(r.location || "")}</td><td>${pill(r)}</td><td class="num">${fmt(r.applied) || dash}</td>
     <td class="num ${r.deadline && -days(r.deadline) <= 3 && -days(r.deadline) >= 0 ? "overdue" : ""}">${fmt(r.deadline) || dash}</td>
     <td class="notes" title="${esc(r.notes)}">${esc(r.notes)}</td><td><button class="rowbtn" data-edit="${r.id}" data-v="applications">Edit</button></td></tr>`; };
@@ -2593,6 +2633,8 @@ document.addEventListener("click", async e => {
   else if (t.dataset.msent) markSent(t.dataset.msent);
   else if (t.dataset.fudone) write("outreach", t.dataset.fudone, {followedUp: today0(), lastContact: today0()});
   else if (t.dataset.atype !== undefined){ ui.applications.type = t.dataset.atype || null; render(); }
+  else if (t.dataset.astage !== undefined){ ui.applications.stage = (t.dataset.astage && ui.applications.stage !== t.dataset.astage) ? t.dataset.astage : null; render(); }
+  else if (t.dataset.stepdone){ const r = state.applications.find(x => x.id === t.dataset.stepdone); if (r) write("applications", r.id, {stepDone: r.status, stepDoneAt: today0()}); }
   else if (t.dataset.tsel){ const [k,b] = t.dataset.tsel.split(":"); triSel[k] = b; render(); }
   else if (t.dataset.pact) prospectAction(t.dataset.pact, t.dataset.pid);
   else if (t.dataset.rel){ e.preventDefault(); e.stopPropagation(); cycleRel(t.dataset.rel); }
