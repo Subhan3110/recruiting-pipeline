@@ -1,0 +1,115 @@
+{% extends "base.html" %}{% block body %}
+<header><h1>Job agent <span class="pill {{ 'ok' if mode=='live' else 'warn' }}">{{ mode|replace('_',' ') }}</span>
+<span class="pill">policy v{{ pv }}</span> <span class="pill {{ 'bad' if tasks else '' }}">{{ tasks|length }} actions for you</span></h1>
+<nav>{% for t in tabs %}<a href="/?tab={{ t }}" class="{{ 'on' if t==tab }}">{{ t|capitalize }}</a>{% endfor %}</nav></header><main>
+{% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+
+{% if tab=='overview' %}
+<div class="card"><h2>Submission status</h2><div class="grid">
+{% for key,label in [('global_pause','Global pause'),('dry_run','Dry run (fill forms, never submit)'),('submission_enabled','Live submission'),('discovery_enabled','Discovery'),('preparation_enabled','Preparation')] %}
+<form method="post" action="/setting" class="stat"><span class="mute small">{{ label }}</span><b class="{{ 'warn' if (key in ['global_pause','dry_run'] and settings[key]) else '' }}">{{ 'On' if settings[key] else 'Off' }}</b>
+<input type="hidden" name="key" value="{{ key }}"><input type="hidden" name="value" value="{{ 'false' if settings[key] else 'true' }}">
+<button class="{{ 'danger' if key=='global_pause' and not settings[key] else '' }}">{{ 'Turn off' if settings[key] else ('Pause all submissions' if key=='global_pause' else 'Turn on') }}</button></form>{% endfor %}
+</div><p class="mute small">Worker last seen: {{ heartbeat or 'never' }}. Applications are sent only when the pause is off, dry run is off and live submission is on.
+Oslo and London applications additionally need your approval of the exact prepared version.</p></div>
+<div class="card"><h2>Pipeline</h2><div class="grid">
+<div class="stat"><span class="mute small">Open vacancies</span><b>{{ counts.vacancies }}</b></div>
+{% for d,label in [('auto','Eligible for automatic application'),('auto_if_selectable','Automatic if location selectable'),('approval','Oslo / London: need approval'),('hold','Held for clarification'),('review','Relevant, below threshold')] %}
+<div class="stat"><span class="mute small">{{ label }}</span><b><a href="/?tab=jobs&decision={{ d }}">{{ counts.decisions.get(d,0) }}</a></b></div>{% endfor %}
+</div><h3>Applications</h3><div class="grid">{% for s in ['awaiting_approval','queued','submitting','submitted','needs_input','uncertain','failed','prepared','closed'] %}
+<div class="stat"><span class="mute small">{{ s|replace('_',' ') }}</span><b><a href="/?tab=applications&state={{ s }}">{{ counts.applications.get(s,0) }}</a></b></div>{% endfor %}</div></div>
+<div class="card"><h2>Standing policy (v{{ pv }})</h2>
+<p>Automatic outside: {% for a in cfg.excluded_areas %}<span class="pill">{{ a.name }}</span> {% endfor %}. One automatic application per employer (limit {{ cfg.employers.max_auto_per_employer }}).
+Daily limit {{ cfg.limits.daily_submissions }}. Automatic threshold {{ cfg.roles.min_score_auto }}. Levels: {{ cfg.seniority.allowed|join(', ') }}.
+Account creation {{ 'allowed' if cfg.accounts.create_accounts else 'off' }}, password recovery {{ 'allowed' if cfg.accounts.password_recovery else 'off' }}. <a href="/?tab=policy">Edit</a></p>
+{% if counts.unconfirmed %}<p class="warn">{{ counts.unconfirmed }} profile facts are unconfirmed. They are not used in real applications. <a href="/?tab=profile">Review</a></p>{% endif %}</div>
+{% endif %}
+
+{% if tab=='jobs' %}
+<div class="card"><h2>Recommended jobs {% if decision_filter %}<span class="pill">{{ decision_filter }}</span> <a class="small" href="/?tab=jobs">show all</a>{% endif %}</h2>
+<p class="mute small">Scores rank vacancies for attention. They are not hiring probabilities.</p><div class="tw"><table>
+<tr><th>Score</th><th>Role</th><th>Location</th><th>Decision</th><th>Why</th><th></th></tr>{% for j in jobs %}
+<tr><td>{{ '%.0f'|format(j.score) }}</td><td><a href="{{ j.canonical_url }}" rel="noopener noreferrer" target="_blank">{{ j.title }}</a><br><span class="mute">{{ j.employer }}</span>{% if j.needs_reconciliation %} <span class="pill warn">possible repost</span>{% endif %}</td>
+<td>{{ j.location_raw }}</td><td><span class="pill {{ 'ok' if j.decision=='auto' else 'warn' }}">{{ j.decision|replace('_',' ') }}</span>{% if j.app_state %}<br><span class="small mute">{{ j.app_state|replace('_',' ') }}</span>{% endif %}</td>
+<td class="small">{{ j.rationale }}</td><td><form method="post" action="/vacancy/dismiss"><input type="hidden" name="vacancy_id" value="{{ j.id }}"><button>Dismiss</button></form></td></tr>{% endfor %}</table></div></div>
+{% endif %}
+
+{% if tab=='applications' %}
+<div class="card"><h2>Applications {% if state_filter %}<span class="pill">{{ state_filter|replace('_',' ') }}</span> <a class="small" href="/?tab=applications">show all</a>{% endif %}</h2><div class="tw"><table>
+<tr><th>State</th><th>Role</th><th>Location</th><th>Reason</th><th>Updated</th><th></th></tr>{% for a in apps %}
+<tr><td><span class="pill {{ 'ok' if a.state=='submitted' else ('bad' if a.state in ['uncertain','failed'] else ('warn' if a.state in ['awaiting_approval','needs_input'] else '')) }}">{{ a.state|replace('_',' ') }}</span>
+{% if a.origin!='agent' %}<br><span class="small mute">{{ a.origin }}</span>{% endif %}</td>
+<td><a href="/application/{{ a.id }}">{{ a.title or a.role_title }}</a><br><span class="mute">{{ a.employer }}</span></td><td>{{ a.selected_location or a.location_raw or '' }}</td>
+<td class="small">{{ a.state_reason or '' }}</td><td class="small">{{ a.updated_at|short }}</td><td>
+{% if a.state=='awaiting_approval' %}<a href="/application/{{ a.id }}">Review and approve</a>{% endif %}
+{% if a.state=='uncertain' %}<form method="post" action="/application/state" class="inline"><input type="hidden" name="app_id" value="{{ a.id }}">
+<button name="action" value="confirm_submitted">It was submitted</button> <button name="action" value="confirm_not_submitted">It was not</button></form>{% endif %}
+{% if a.state in ['failed','needs_input'] %}<form method="post" action="/application/state" class="inline"><input type="hidden" name="app_id" value="{{ a.id }}"><button name="action" value="retry">Re-check</button></form>{% endif %}
+</td></tr>{% endfor %}</table></div></div>
+{% endif %}
+
+{% if tab=='actions' %}
+<div class="card"><h2>Actions for you</h2>{% if not tasks %}<p class="mute">Nothing is waiting on you.</p>{% endif %}{% for t in tasks %}
+<div style="border-bottom:1px solid var(--line);padding:8px 0"><span class="pill">{{ t.kind|replace('_',' ') }}</span> <b>{{ t.title }}</b><br><span class="small mute">{{ t.detail }}</span>
+{% if t.entity_type=='answer' %}<form method="post" action="/answer" style="margin-top:6px"><input type="hidden" name="key" value="{{ t.entity_id }}"><input type="hidden" name="task_id" value="{{ t.id }}">
+<input name="answer" placeholder="Your answer (exact option text for choices; several separated by ;)" size="50" required>
+<select name="scope_type"><option value="global">use everywhere</option><option value="country">only this country</option><option value="employer">only this employer</option></select>
+<input name="scope_value" placeholder="country code or employer id" size="18"><button class="primary">Save answer</button></form>
+{% else %}<form method="post" action="/task" style="margin-top:6px"><input type="hidden" name="task_id" value="{{ t.id }}"><input name="resolution" placeholder="note (optional)" size="40">
+<button name="status" value="done">Mark done</button> <button name="status" value="dismissed">Dismiss</button></form>{% endif %}</div>{% endfor %}</div>
+{% endif %}
+
+{% if tab=='employers' %}
+<div class="card"><h2>Employers</h2><div class="tw"><table><tr><th>Employer</th><th>Applications</th><th>Open roles</th><th>Allowance</th><th></th></tr>{% for e in employers %}
+<tr><td>{{ e.name }}{% if e.identity_uncertain %} <span class="pill warn">identity uncertain</span>{% endif %}{% if e.excluded %} <span class="pill bad">excluded</span>{% endif %}<br><span class="small mute">{{ e.id }} {{ e.domain or '' }} {{ e.kind if e.kind!='employer' else '' }}</span></td>
+<td>{{ e.applied }}</td><td>{{ e.open_vacancies }}</td><td>{{ cfg.employers.max_auto_per_employer + e.extra_auto_allowed }}</td>
+<td><form method="post" action="/employer" class="inline"><input type="hidden" name="employer_id" value="{{ e.id }}">
+{% if e.excluded %}<button name="action" value="include">Remove exclusion</button>{% else %}<button name="action" value="exclude" class="danger">Exclude</button>{% endif %}
+<button name="action" value="allow">Allow one more application</button>
+{% if e.identity_uncertain %}<button name="action" value="distinct">It is a separate employer</button> <input name="reason" placeholder="id of employer to merge into" size="22"><button name="action" value="merge">Merge</button>{% endif %}</form></td></tr>{% endfor %}</table></div></div>
+{% endif %}
+
+{% if tab=='accounts' %}
+<div class="card"><h2>Recruitment accounts</h2><p class="mute small">Passwords are never displayed. They live encrypted in the secret store.</p><div class="tw"><table>
+<tr><th>Portal</th><th>Tenant / employer</th><th>Login</th><th>Verification</th><th>Last login</th><th>Pending</th><th></th></tr>{% for a in accounts %}
+<tr><td>{{ a.portal_origin }}</td><td>{{ a.tenant }} {{ a.employer_name or '' }}</td><td>{{ a.login_identifier }}<br><span class="small mute">credential: {{ a.credential_source if a.has_credential else 'none' }}</span></td>
+<td>{{ a.verification_status }}</td><td>{{ a.last_login_ok|short or 'never' }}{% if a.failed_logins %}<br><span class="bad small">{{ a.failed_logins }} failed</span>{% endif %}</td><td>{{ a.pending_action or '' }}</td>
+<td><form method="post" action="/revoke"><input type="hidden" name="name" value="{{ a.id }}"><button class="danger">Revoke</button></form></td></tr>{% else %}<tr><td colspan="7" class="mute">No accounts yet. Greenhouse-hosted forms do not need one.</td></tr>{% endfor %}</table></div>
+<h3>Connected services</h3><p>Mailbox: <b>{{ mail_provider or 'not connected' }}</b> {% if mail_provider %}<form method="post" action="/revoke" class="inline"><input type="hidden" name="name" value="mail"><button class="danger">Revoke mailbox access</button></form>{% endif %}</p>
+<h3>Stored secrets (references only)</h3><div class="tw"><table><tr><th>Reference</th><th>Scope</th><th>Updated</th></tr>{% for s in secrets %}<tr><td>{{ s.ref }}</td><td>{{ s.scope }}</td><td>{{ s.updated_at|short }}</td></tr>{% endfor %}</table></div></div>
+{% endif %}
+
+{% if tab=='profile' %}
+<div class="card"><h2>Candidate profile</h2><form method="post" action="/fact"><input type="hidden" name="key" value="-"><button name="action" value="confirm_all">Confirm every unconfirmed fact as shown</button>
+<span class="mute small">Only confirmed facts are used in real applications. Corrections keep the old value in history.</span></form><div class="tw"><table>
+<tr><th>Fact</th><th>Value</th><th>Status</th><th>Source</th><th></th></tr>{% for f in facts %}<tr><td>{{ f.key }}</td><td><pre>{{ f.value|tojson }}</pre>{% if f.note %}<span class="small warn">{{ f.note }}</span>{% endif %}</td>
+<td><span class="pill {{ 'ok' if f.status in ['confirmed','preference'] else 'warn' }}">{{ f.status }}</span></td><td class="small mute">{{ f.source }}<br>{{ (f.confirmed_at or f.created_at)|short }}</td>
+<td><form method="post" action="/fact" class="inline"><input type="hidden" name="key" value="{{ f.key }}">{% if f.status in ['unconfirmed','proposed'] %}<button name="action" value="confirm">Confirm</button>{% endif %}
+<button name="action" value="retire" class="danger">Remove</button></form></td></tr>{% endfor %}</table></div>
+<h3>Add or correct a fact</h3><form method="post" action="/fact"><input name="key" placeholder="key, e.g. contact/phone" size="28" required>
+<input name="value" placeholder='value (text or JSON)' size="50" required> <input name="note" placeholder="note" size="20"><button class="primary">Save as confirmed</button></form>
+<h3>Work authorisation by country</h3>{% if auth_needed %}<p class="warn small">Roles are currently held for: {{ auth_needed|join(', ') }}. "EEA" covers all EEA states.</p>{% endif %}
+<form method="post" action="/workauth"><input name="country" placeholder="ISO code, e.g. US or EEA" size="22" required>
+<label>May work there <select name="authorised"><option>no</option><option>yes</option></select></label>
+<label>Needs sponsorship <select name="sponsorship"><option>no</option><option>yes</option></select></label><input name="basis" placeholder="basis (citizen, permit ...)" size="24"><button class="primary">Save</button></form></div>
+<div class="card"><h2>Answer library</h2><div class="tw"><table><tr><th>Question</th><th>Scope</th><th>Answer</th><th>Status</th><th>Source</th></tr>{% for a in answers %}
+<tr><td>{{ a.question_key }}</td><td>{{ a.scope_type }} {{ a.scope_value }}</td><td>{{ a.answer }}</td><td><span class="pill {{ 'ok' if a.status=='confirmed' else 'warn' }}">{{ a.status }}</span></td><td class="small mute">{{ a.source }}</td></tr>{% endfor %}</table></div>
+<form method="post" action="/answer" style="margin-top:8px"><input name="key" placeholder="question key, e.g. salary_expectation" size="30" required><input name="answer" placeholder="answer" size="40" required>
+<select name="scope_type"><option>global</option><option>country</option><option>employer</option></select><input name="scope_value" placeholder="scope value" size="14"><button class="primary">Save answer</button></form></div>
+<div class="card"><h2>Your comments (kept verbatim)</h2>{% for c in comments %}<div style="border-bottom:1px solid var(--line);padding:6px 0"><pre>{{ c.verbatim }}</pre><span class="small mute">{{ c.source }} · {{ c.ts|short }}{% if c.interpretation %} · read as: {{ c.interpretation }}{% endif %}</span></div>{% endfor %}
+<form method="post" action="/comment" style="margin-top:8px"><textarea name="text" rows="3" placeholder="Add a comment or correction in your own words" required></textarea><button class="primary">Add comment</button></form></div>
+{% endif %}
+
+{% if tab=='policy' %}
+<div class="card"><h2>Standing policy v{{ pv }}</h2><p class="mute small">Saving creates a new version. Every submission records the version that governed it. Geographic boundaries are under <code>excluded_areas</code>, volume under <code>limits</code>.</p>
+<form method="post" action="/policy"><textarea name="config_json" rows="30" spellcheck="false">{{ policy_json }}</textarea><input name="note" placeholder="what changed" size="50" required> <button class="primary">Save new version</button></form>
+<h3>History</h3><div class="tw"><table>{% for h in policy_history %}<tr><td>v{{ h.version }}</td><td>{{ h.created_at|short }}</td><td>{{ h.note }}</td><td class="mute">{{ h.actor }}</td></tr>{% endfor %}</table></div></div>
+{% endif %}
+
+{% if tab=='import' %}
+<div class="card"><h2>Import previous applications</h2><p class="mute small">Paste JSON (a list, or {"applications": [...]}) or CSV with columns company, role, status, applied, location, notes.
+Imported applications count toward the one-per-employer rule and block duplicates. Re-importing is safe.</p>
+<form method="post" action="/import"><textarea name="payload" rows="12" required placeholder='[{"company":"Example Bank","role":"Summer Analyst 2027","status":"Applied","applied":"2026-10-01"}]'></textarea>
+<input name="source" value="manual import" size="30"> <button class="primary">Import</button></form></div>
+{% endif %}
+</main>{% endblock %}

@@ -60,6 +60,11 @@ class GreenhouseFormSubmitter:
         except Exception:  # noqa: BLE001
             return SubmitResult("blocked", blocker="closed", error="application form not found; the vacancy may have closed",
                                 evidence={"url": page.url})
+        # The server-rendered inputs exist before the page's scripts attach; wait so dropdowns actually respond.
+        try:
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:  # noqa: BLE001 - a long-polling page never goes idle; the dropdown helper retries anyway
+            pass
         filled, problems = 0, []
         if package.get("phone_country") and page.locator(_css_id("country")).count():
             try:
@@ -109,12 +114,19 @@ class GreenhouseFormSubmitter:
 
     def _fill(self, page, a: dict, package: dict):
         field, typ = a["field"], a["type"]
+        if field == "location":  # hosted form renders this as an async city autocomplete
+            if page.locator(_css_id("candidate-location")).count():
+                self._combobox(page, "candidate-location", a["value"].split(",")[0], prefix=True, typed=a["value"].split(",")[0])
+                return
         loc = page.locator(_css_id(field))
         if typ == "input_file":
             f = package["files"][a["key"]]
             loc.set_input_files({"name": f["filename"], "mimeType": f["mime"], "buffer": f["content"]})
-            if not loc.evaluate("el => el.files.length === 1"):
-                raise RuntimeError("attachment not accepted")
+            # The live form swaps the input for a file chip once it accepts the upload; the fixture keeps the input.
+            page.wait_for_function(
+                """([id, name]) => { const el = document.getElementById(id);
+                     return (el && el.files && el.files.length === 1) || document.body.innerText.includes(name); }""",
+                arg=[field, f["filename"]], timeout=20000)
             return
         if typ in ("input_text", "textarea"):
             loc.fill(a["value"])
@@ -137,21 +149,31 @@ class GreenhouseFormSubmitter:
             return
         self._combobox(page, field, a["value"])
 
-    def _combobox(self, page, field: str, label: str, prefix: bool = False):
-        """react-select: focus, type to filter, pick the exact option, then read the selection back."""
+    def _combobox(self, page, field: str, label: str, prefix: bool = False, typed: str | None = None):
+        """react-select: focus, type to filter, pick the matching option in *this* control's menu, read the selection back."""
         loc = page.locator(_css_id(field))
-        loc.click()
-        loc.fill(label[:40])
-        opts = page.locator('[role="option"]')
-        opts.first.wait_for(timeout=8000)
-        pat = re.compile(("^" + re.escape(label)) if prefix else ("^\\s*" + re.escape(label) + "\\s*$"), re.I)
+        # Options live in the open react-select menu; other widgets on the page also use role=option.
+        opts = page.locator('.select__menu [role="option"], .select__menu .select__option')
+        for attempt in range(4):
+            loc.click()
+            loc.fill("")
+            loc.press_sequentially((typed or label)[:40], delay=25)  # async menus only react to real key events
+            try:
+                opts.first.wait_for(timeout=4000)
+                break
+            except Exception:  # noqa: BLE001 - scripts not attached yet, or a slow lookup: try again
+                if attempt == 3:
+                    raise
+                page.wait_for_timeout(1500)
+        pat = re.compile(("^\\s*" + re.escape(label)) if prefix else ("^\\s*" + re.escape(label) + "\\s*$"), re.I)
         target = opts.filter(has_text=pat).first
         target.wait_for(timeout=5000)
         chosen = target.inner_text().strip()
         target.click()
-        shown = loc.evaluate("""el => { const c = el.closest('[class*="select__control"], [class*="control"]') || el.parentElement.parentElement;
+        shown = loc.evaluate("""el => { const c = el.closest('.select__control') || el.parentElement.parentElement;
                                         return (c ? c.innerText : '') + ' ' + el.value; }""")
-        if chosen.lower()[:25] not in shown.lower():
+        tokens = [t for t in re.split(r"\s+", chosen.lower()) if t]
+        if chosen.lower()[:25] not in shown.lower() and not any(t in shown.lower() for t in tokens):
             raise RuntimeError("selection did not register")
 
     def _await_outcome(self, page, after_code: bool = False) -> str:

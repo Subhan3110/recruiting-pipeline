@@ -53,11 +53,37 @@ def resolve(conn: Conn, name: str, domain: str | None = None, source_key: str | 
             conn.q("INSERT INTO employers (id, name, domain, kind, created_at) VALUES (?,?,?,?,?)",
                    (eid, name.strip(), normalise_domain(domain), kind, now()))
             conn.event("employer.created", "employer", eid, {"name": name}, provenance=provenance)
+            _flag_lookalikes(conn, eid, name)
             emp = conn.one("SELECT * FROM employers WHERE id=?", (eid,))
         for typ, alias in (("name", normalise(name)), ("domain", normalise_domain(domain)), ("source", source_key)):
             if alias:
                 add_alias(conn, emp["id"], typ, alias, provenance)
         return emp
+
+
+def _flag_lookalikes(conn: Conn, employer_id: str, name: str):
+    """'Schonfeld' and 'Schonfeld Strategic Advisors' may be one employer. Never merge on a guess, never ignore it:
+    mark the new record uncertain so nothing is sent automatically until the user says same or different."""
+    from . import profile
+
+    mine = normalise(name)
+    if len(mine) < 4:
+        return
+    for row in conn.q("SELECT a.alias, e.id, e.name FROM employer_aliases a JOIN employers e ON e.id=a.employer_id "
+                      "WHERE a.alias_type='name' AND e.id<>? AND e.parent_id IS NULL", (employer_id,)):
+        other = row["alias"]
+        if len(other) >= 4 and other != mine and (mine.startswith(other + " ") or other.startswith(mine + " ")):
+            conn.q("UPDATE employers SET identity_uncertain=1 WHERE id=?", (employer_id,))
+            profile.open_task(conn, "reconcile", f"Same employer? '{name}' and '{row['name']}'",
+                              "Their names overlap. Until you decide, automatic applications to the newer record are held. "
+                              f"Merge them if they are the same (keep {row['id']}, drop {employer_id}) or mark this done if they differ.",
+                              "employer", employer_id, dedup_key=f"emp-same:{employer_id}:{row['id']}")
+            conn.event("employer.lookalike", "employer", employer_id, {"other": row["id"]})
+
+
+def confirm_distinct(conn: Conn, employer_id: str, actor: str = "user"):
+    conn.q("UPDATE employers SET identity_uncertain=0 WHERE id=?", (employer_id,))
+    conn.event("employer.confirmed_distinct", "employer", employer_id, actor=actor)
 
 
 def add_alias(conn: Conn, employer_id: str, alias_type: str, alias: str, provenance: str = "") -> bool:

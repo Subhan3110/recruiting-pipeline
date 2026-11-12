@@ -121,6 +121,11 @@ def _pick_option(options: list[dict], text: str) -> dict | None:
         if len(hits) == 1:
             return hits[0]
     hits = [o for o in options if t and (t in o["label"].lower() or o["label"].strip().lower() in t)]
+    if len(hits) == 1:
+        return hits[0]
+    # Last resort: exactly one option shares a distinctive word ("Company website" -> "Flow Traders Website").
+    words = [w for w in re.findall(r"[a-z]{5,}", t) if w not in ("company", "other", "please", "prefer")]
+    hits = [o for o in options if any(re.search(rf"\b{w}\b", o["label"].lower()) for w in words)]
     return hits[0] if len(hits) == 1 else None
 
 
@@ -194,6 +199,8 @@ def resolve_form(conn: Conn, form: dict, vacancy: dict, geo_eval: dict, strict: 
             continue
         field = fields[0]
         fname, ftype, options = field["name"], field["type"], field.get("options") or []
+        if ftype == "input_hidden":
+            continue  # set by the page itself (e.g. coordinates from the location autocomplete)
         base = fname if fname in BUILTIN else None
         key, country = (base, None) if base else classify(q["label"], countries)
         entry = {"field": fname, "type": ftype, "label": q["label"], "key": key, "required": q["required"]}

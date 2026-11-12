@@ -28,7 +28,8 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>Job Applicatio
 <div id="errors"></div>
 <button type="submit">Submit application</button>
 </form>
-<div id="listbox"></div>
+<div id="listbox" class="select__menu"></div>
+<div role="option">decoy option from another widget</div>
 <script>
 const MODE = location.pathname.split('/')[1];
 document.querySelectorAll('input[role=combobox]').forEach(inp => {

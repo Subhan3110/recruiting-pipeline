@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block body %}
+<header><h1><a href="/?tab=applications">← Applications</a> · {{ a.employer_name }}: {{ (v.title if v else a.role_title) }}</h1></header><main>
+<div class="card"><h2>Status <span class="pill">{{ a.state|replace('_',' ') }}</span></h2><p>{{ a.state_reason or '' }}</p>
+{% if v %}<p><a href="{{ v.canonical_url }}" target="_blank" rel="noopener noreferrer">Vacancy</a> · {{ v.location_raw }}{% if a.selected_location %} · applying for: <b>{{ a.selected_location }}</b>{% endif %}
+{% if ev %} · score {{ '%.0f'|format(ev.score) }} · policy v{{ ev.policy_version }}{% endif %}</p>{% if ev %}<p class="small">{{ ev.rationale }}</p>{% endif %}{% endif %}
+{% if a.state=='awaiting_approval' and ver %}<form method="post" action="/approve"><input type="hidden" name="app_id" value="{{ a.id }}">
+<button class="primary">Approve version {{ ver.version }} for submission</button> <span class="mute small">Approval covers exactly the answers and documents below ({{ ver.content_hash[:12] }}). Any change needs a new approval.</span></form>{% endif %}
+<form method="post" action="/application/state" style="margin-top:8px"><input type="hidden" name="app_id" value="{{ a.id }}">
+{% if a.state=='prepared' and not a.requires_approval %}<button name="action" value="queue">Queue for submission</button>{% endif %}
+{% if a.state not in ['submitted','closed','submitting','uncertain'] %}<button name="action" value="close" class="danger">Do not apply</button>{% endif %}</form></div>
+{% if ver %}<div class="card"><h2>Prepared application, version {{ ver.version }}</h2>
+<h3>Documents</h3>{% for d in docs %}<p><a href="/document/{{ d.id }}" target="_blank">{{ d.filename }}</a> <span class="mute small">{{ d.kind }} · sha256 {{ d.sha256[:16] }}</span></p>{% else %}<p class="mute">None.</p>{% endfor %}
+<h3>Answers</h3><div class="tw"><table><tr><th>Question</th><th>Answer</th><th>Source</th></tr>{% for x in ver.answers.answers %}<tr><td>{{ x.label }}{% if x.required %} *{% endif %}</td><td>{{ x.value }}</td><td class="small mute">{{ x.source }}</td></tr>{% endfor %}
+{% for x in ver.answers.missing %}<tr><td>{{ x.label }} *</td><td class="bad">missing: {{ x.why }}</td><td class="small mute">{{ x.options|join(', ') }}</td></tr>{% endfor %}
+{% for x in ver.answers.skipped %}<tr><td>{{ x.label }}</td><td class="mute">left blank (optional)</td><td></td></tr>{% endfor %}</table></div>
+<p class="small mute">Versions: {% for x in vers %}v{{ x.version }} ({{ x.created_at|short }}) {% endfor %}</p></div>{% endif %}
+<div class="card"><h2>Submission evidence</h2>{% for t in attempts %}<div style="border-bottom:1px solid var(--line);padding:6px 0"><span class="pill">{{ t.mode }}</span> <span class="pill">{{ t.outcome or 'in progress' }}</span>
+version {{ t.version }} · policy v{{ t.policy_version }} · started {{ t.started_at|short }} · submit clicked {{ t.submit_clicked_at|short or 'no' }}<pre>{{ t.evidence or '' }}</pre>{% if t.error %}<span class="bad small">{{ t.error }}</span>{% endif %}</div>{% else %}<p class="mute">No attempts.</p>{% endfor %}
+{% for m in mails %}<p class="small">{{ m.kind }} e-mail · {{ m.sender_domain }} · {{ m.received_at|short }} · ref {{ m.message_ref }}</p>{% endfor %}
+{% for p in approvals %}<p class="small">Approved {{ p.approved_at|short }} by {{ p.actor }} for {{ p.content_hash[:12] }}{% if p.revoked_at %} (superseded {{ p.revoked_at|short }}){% endif %}</p>{% endfor %}</div>
+<div class="card"><h2>History</h2><div class="tw"><table>{% for t in transitions %}<tr><td class="small">{{ t.ts|short }}</td><td>{{ t.from_state or '' }} → {{ t.to_state }}</td><td class="small">{{ t.reason }}</td><td class="small mute">{{ t.actor }}</td></tr>{% endfor %}</table></div></div>
+</main>{% endblock %}

@@ -197,6 +197,8 @@ def evaluate(conn: Conn, vacancy_id: str, llm=None) -> dict:
               "dismissed": {"result": "fail" if v["dismissed_at"] else "pass", "reason": "dismissed by user" if v["dismissed_at"] else ""},
               "seniority": sen, "language": lang, "education": edu, "work_authorisation": auth,
               "location": {"result": "unknown" if g["decision"] == "hold" else "pass", "reason": "; ".join(g["reasons"])}}
+    if v["employer_uncertain"]:
+        checks["employer_identity"] = {"result": "unknown", "reason": "employer may be the same as one already on file; confirm before applying"}
     if v["needs_reconciliation"]:
         checks["repost"] = {"result": "unknown", "reason": "looks like a repost of an earlier vacancy at this employer; needs reconciliation"}
     fails = [f"{k}: {c['reason']}" for k, c in checks.items() if c["result"] == "fail"]

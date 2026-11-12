@@ -1,0 +1,19 @@
+{
+  "_comment": "Synthetic example. Keep your real file outside this repository and load it with: python -m jobagent profile-import <file>",
+  "facts": [
+    {"key": "identity/name", "value": {"first": "Test", "last": "Candidate", "full": "Test Candidate"}, "status": "confirmed", "source": "CV 2026-01"},
+    {"key": "contact/email", "value": "test.candidate@example.com", "status": "confirmed", "source": "CV 2026-01"},
+    {"key": "contact/phone", "value": "+47 40000000", "status": "confirmed", "source": "CV 2026-01"},
+    {"key": "contact/location", "value": {"city": "Bergen", "country": "Norway"}, "status": "confirmed", "source": "user"},
+    {"key": "education/uni", "value": {"institution": "Example Business School", "degree": "Bachelor in Finance", "level": "Bachelor's", "field": "Finance", "graduation": "2027-06", "gpa_text": "4.1/5.0"}, "status": "confirmed", "source": "CV 2026-01"},
+    {"key": "employment/acme", "value": {"employer": "Acme Audit AS", "title": "AML Assistant", "start": "2025-09", "end": null, "bullets": ["Screened transactions against sanctions lists"]}, "status": "confirmed", "source": "CV 2026-01"},
+    {"key": "languages/en", "value": {"language": "English", "level": "fluent"}, "status": "confirmed", "source": "CV 2026-01"},
+    {"key": "skills/excel", "value": {"name": "Excel", "level": "advanced"}, "status": "confirmed", "source": "CV 2026-01"},
+    {"key": "stories/aml", "value": {"tags": ["compliance", "aml"], "text": "At Acme Audit I screen transactions against sanctions lists."}, "status": "confirmed", "source": "user wording"},
+    {"key": "work_auth/EEA", "value": {"authorised": true, "needs_sponsorship": false, "basis": "citizen"}, "status": "confirmed", "source": "user"},
+    {"key": "work_auth/US", "value": {"authorised": false, "needs_sponsorship": true}, "status": "confirmed", "source": "user"}
+  ],
+  "comments": [{"source": "CV notes", "verbatim": "Say 'I have traded futures', not 'I am a trader'."}],
+  "questions": [],
+  "answers": [{"question_key": "heard_from", "answer": "Company website", "status": "confirmed", "source": "user"}]
+}

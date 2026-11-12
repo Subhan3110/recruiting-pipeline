@@ -92,7 +92,7 @@ def dismiss(conn: Conn, vacancy_id: str, reason: str = "", actor: str = "user"):
 
 
 def get(conn: Conn, vacancy_id: str) -> dict | None:
-    v = conn.one("SELECT v.*, e.name AS employer_name, e.excluded AS employer_excluded FROM vacancies v JOIN employers e ON e.id=v.employer_id WHERE v.id=?",
+    v = conn.one("SELECT v.*, e.name AS employer_name, e.excluded AS employer_excluded, e.identity_uncertain AS employer_uncertain FROM vacancies v JOIN employers e ON e.id=v.employer_id WHERE v.id=?",
                  (vacancy_id,))
     if v:
         v["locations"] = unj(v["locations"], [])

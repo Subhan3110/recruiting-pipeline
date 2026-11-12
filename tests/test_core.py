@@ -255,3 +255,16 @@ def test_backup_and_restore_roundtrip(conn, tmp_path):
     assert secretstore.get(fresh, "account/x", "recruitment") == "pw"
     with pytest.raises(RuntimeError):
         backup.restore(fresh, path)
+
+
+def test_lookalike_employer_with_history_blocks_automatic_application(conn):
+    seed_profile(conn)
+    apps.import_application(conn, {"company": "Schonfeld", "role": "Middle Office", "status": "Rejected", "source": "tracker"})
+    vid = add_vacancy(conn, employer="Schonfeld Strategic Advisors", sid="schonfeld/1")
+    ev = matching.evaluate(conn, vid)
+    assert ev["decision"] == "hold" and "employer_identity" in ev["rationale"]
+    assert conn.one("SELECT 1 FROM user_tasks WHERE kind='reconcile' AND title LIKE 'Same employer%'")
+    old = employers.find(conn, "Schonfeld")
+    employers.merge(conn, old["id"], vacancies.get(conn, vid)["employer_id"])
+    assert matching.evaluate(conn, vid)["decision"] == "auto"      # relevant, but ...
+    assert conn.val("SELECT COUNT(*) FROM employer_slots WHERE employer_id=?", (old["id"],)) == 1  # ... the allowance is already used
