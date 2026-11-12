@@ -1,0 +1,9 @@
+# Source configuration (no personal data). Board tokens were verified live on 2026-11-12:
+# each returned HTTP 200 with a non-empty listing from boards-api.greenhouse.io.
+[greenhouse]
+boards = [
+  "point72", "janestreet", "imc", "drweng", "jumptrading", "squarepointcapital", "flowtraders", "akunacapital", "virtu",
+  "aqr", "worldquant", "schonfeld", "generalatlantic",
+  "stripe", "adyen", "wise", "monzo", "n26", "sumup", "gocardless", "payoneer", "tamara", "bitpanda",
+  "robinhood", "coinbase", "brex", "chime", "affirm", "sofi", "mercury", "carta", "ripple", "gemini", "blockchain",
+]

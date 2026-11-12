@@ -1,0 +1,23 @@
+[project]
+name = "jobagent"
+version = "0.1.0"
+description = "Personal finance job-search and application agent"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110", "uvicorn>=0.29", "jinja2>=3.1", "python-multipart>=0.0.9",
+  "cryptography>=42", "requests>=2.31", "reportlab>=4", "pypdf>=4", "playwright>=1.44",
+]
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1"]
+dev = ["pytest>=8"]
+[project.scripts]
+jobagent = "jobagent.cli:main"
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+include = ["jobagent*"]
+[tool.setuptools.package-data]
+jobagent = ["templates/*.html"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
