@@ -285,6 +285,8 @@ a.mail:hover{text-decoration:underline}
 .sconfirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;padding:8px;border-radius:4px;background:var(--soft)}
 .sconfirm .btn{padding:4px 10px;font-size:12px}
 .sline{font-size:12px;font-weight:500}
+.cvchk{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink);flex-direction:row;cursor:pointer}
+.cvchk input{min-height:0;width:15px;height:15px;accent-color:var(--accent)}
 .sline.ok{color:var(--s-good)} .sline.err{color:var(--s-bad)}
 
 .ai-section{display:grid;gap:12px}
@@ -1113,6 +1115,11 @@ input,select,textarea{border-radius:10px}
           <div id="profile-primary" class="profile-primary"><p class="empty-note">Add your CV below to see it here.</p></div>
         </div>
         <div class="panel-box">
+          <div class="profile-panel-title"><h3>CV on emails</h3><span>Attached when you press Send</span></div>
+          <div id="email-cv"><p class="empty-note">Loading…</p></div>
+          <input class="doc-upload-input" id="email-cv-file" type="file" accept=".pdf,application/pdf">
+        </div>
+        <div class="panel-box">
           <div class="profile-panel-title"><h3>Reusable candidate brief</h3><span>AI-ready</span></div>
           <p class="profile-tip">Copy your profile details and synced document links into Claude, ChatGPT or another AI when preparing an application.</p>
           <div class="acts" style="margin-top:13px"><button class="btn" id="profile-copy-brief" type="button">Copy candidate brief ↗</button></div>
@@ -1531,6 +1538,7 @@ function renderProfile(){
   const alert=$("doc-storage-alert");
   alert.hidden=!profileStorageError;
   if(profileStorageError)alert.textContent=profileStorageError+" Use synced HTTPS document links instead.";
+  if(!$("email-cv-note")?.textContent && !cvBusy) renderEmailCv();
 }
 function candidateBrief(){
   const p=candidateProfile;
@@ -2189,8 +2197,9 @@ function draftBox(label, text, subject, ctx){
       <button class="btn primary" data-msent="${esc(key)}">Done, mark sent</button></div></div>`;
   const statusLine = sent ? `<div class="sline ok">Sent ✓ ${esc(st?.at ? new Date(st.at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "")}</div>`
     : st?.status === "failed" ? `<div class="sline err">Not sent: ${esc(st.error || "unknown reason")}. Fix it and press Send again.</div>` : "";
+  const cvBox = ctx.channel === "Email" ? `<label class="cvchk"><input type="checkbox" data-attachcv="${esc(key)}"${wantsCv(key, ctx) ? " checked" : ""}> Attach CV${cvName() ? " (" + esc(cvName()) + ")" : " (none uploaded yet)"}</label>` : "";
   const confirmLine = key && confirming.has(key) ? `<div class="sconfirm">Send this to <b>${esc(ctx.name)}</b> on ${esc(ctx.channel)}${ctx.to ? " (" + esc(ctx.to) + ")" : ""}? It goes out exactly as written.
-      <button class="btn primary" data-send-yes="${esc(key)}">Confirm send</button><button class="btn" data-send-no="${esc(key)}">Cancel</button></div>` : "";
+      ${cvBox}<button class="btn primary" data-send-yes="${esc(key)}">Confirm send</button><button class="btn" data-send-no="${esc(key)}">Cancel</button></div>` : "";
   const body = key && draftEditing.has(key) ? `<textarea class="dedit" data-edtext="${esc(key)}" rows="${Math.max(6, text.split("\n").length + 1)}">${esc(text)}</textarea>` : `<pre>${esc(text)}</pre>`;
   return `<div class="draft"><div class="dh"><b>${esc(label)}</b><span class="dtools">${tools}</span></div>${subject ? `<div class="subj">${esc(subject)}</div>` : ""}${body}${confirmLine}${statusLine}</div>`;
 }
@@ -2210,22 +2219,73 @@ async function fireSend(key){
     sendState.set(key, {status:"failed", error: e.code === "not_in_manifest" || e.code === "approval_required" ? "the page needs your OK, press Send again and allow it" : "could not start sending"}); render();
   }
 }
+/* CV on emails: one PDF stored as an artifact asset (id in db settings/cv), so it is the same on every device.
+   Falls back to the newest CV saved in this browser under Profile & Docs. */
+let emailCv = null, assetsNs = null, cvBusy = false;
+const attachCv = new Map();            // per draft: true/false; default on for new emails, off for thread replies
+const wantsCv = (key, c) => attachCv.has(key) ? attachCv.get(key) : !c.threadId;
+async function blobToB64(blob){
+  const buf = new Uint8Array(await blob.arrayBuffer()); let s = "";
+  for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+async function cvAttachment(){
+  if (emailCv?.assetId){
+    const r = await fetch("/_blob/" + emailCv.assetId);
+    if (r.ok) return {content: await blobToB64(await r.blob()), filename: emailCv.filename || "CV.pdf", mimeType: "application/pdf"};
+  }
+  const local = localDocuments.filter(d => d.category === "CV").sort((a,b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0];
+  if (local && localDocsDB){
+    const item = await idbOperation("readonly", st => st.get(local.id));
+    if (item?.blob) return {content: await blobToB64(item.blob), filename: local.fileName || "CV.pdf", mimeType: item.blob.type || "application/pdf"};
+  }
+  return null;
+}
+function cvName(){ return emailCv?.filename || localDocuments.find(d => d.category === "CV")?.fileName || ""; }
+function renderEmailCv(){
+  const el = $("email-cv"); if (!el) return;
+  const name = cvName();
+  el.innerHTML = `<p class="profile-tip">${name ? `<strong>${esc(name)}</strong> is attached to new emails you send from the tracker${emailCv?.uploadedAt ? " · updated " + esc(docDate(emailCv.uploadedAt)) : ""}.` : "No CV yet. Upload a PDF and it goes with every new email you send from here."}</p>
+    ${assetsNs ? `<div class="acts" style="margin-top:12px"><label for="email-cv-file" class="btn${name ? "" : " primary"}" style="display:inline-block">${cvBusy ? "Uploading…" : name ? "Replace CV" : "Upload CV (PDF)"}</label></div>` : ""}
+    <p class="tri-meta" id="email-cv-note" aria-live="polite"></p>`;
+}
+async function uploadEmailCv(file){
+  if (!file || !assetsNs || !db) return;
+  if (!/\.pdf$/i.test(file.name)) { $("email-cv-note").textContent = "Upload the CV as a PDF."; return; }
+  cvBusy = true; renderEmailCv();
+  try {
+    const up = await assetsNs.upload(file, {type: "application/pdf"});
+    await db.doc("settings/cv").set({assetId: up.id, filename: file.name, sizeBytes: up.sizeBytes, uploadedAt: new Date().toISOString()});
+    cvBusy = false; renderEmailCv(); $("email-cv-note").textContent = "Saved. New emails now carry this CV.";
+  } catch(e){
+    cvBusy = false; renderEmailCv();
+    $("email-cv-note").textContent = e?.code === "too_large" ? "That file is too big." : e?.code === "unsupported_type" ? "Upload the CV as a PDF." : "Could not upload the CV (" + (e?.code || "error") + ").";
+  }
+}
+document.addEventListener("change", e => { if (e.target.id === "email-cv-file"){ uploadEmailCv(e.target.files?.[0]); e.target.value = ""; }
+  const k = e.target.dataset?.attachcv; if (k){ attachCv.set(k, e.target.checked); } });
 /* Email: the page sends straight from the viewer's own Gmail, right after the click and the confirm. */
 const isEmail = s => /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(s || "");
 async function sendEmailDirect(key, c, text, logId){
   const fail = msg => { sendState.set(key, {status:"failed", error:msg}); render();
     if (db) db.collection("sendlog").doc(logId).set({status:"failed", key, name:c.name, channel:"Email", at:new Date().toISOString(), error:msg}).catch(() => {}); };
   if (!text.trim()) return fail("the draft is empty");
-  let res;
+  let res, extra = {};
+  if (wantsCv(key, c)){
+    let att = null;
+    try { att = await cvAttachment(); } catch(e){}
+    if (!att) return fail("no CV to attach. Upload it under Profile & Docs, or untick Attach CV");
+    extra = {attachments: [att]};
+  }
   try {
     if (c.threadId){
       const th = (await mcp.callTool("Gmail", "get_thread", {threadId: c.threadId, messageFormat: "METADATA_ONLY"}, {cache:false})).payload || {};
       const msgs = th.messages || [];
       const last = msgs[msgs.length - 1];
       if (!last?.id) return fail("could not find the email thread, use Copy and reply in Gmail");
-      res = await mcp.callTool("Gmail", "reply", {messageId: last.id, body: text, includeSignature: false}, {cache:false});
+      res = await mcp.callTool("Gmail", "reply", {messageId: last.id, body: text, includeSignature: false, ...extra}, {cache:false});
     } else if (isEmail(c.to)){
-      res = await mcp.callTool("Gmail", "send_message", {to:[c.to.trim()], subject: c.subject || "", body: text, includeSignature: false}, {cache:false});
+      res = await mcp.callTool("Gmail", "send_message", {to:[c.to.trim()], subject: c.subject || "", body: text, includeSignature: false, ...extra}, {cache:false});
     } else {
       return fail(c.emailUrl ? "this reply needs the email thread id, use Copy and reply in Gmail" : "no email address on this person");
     }
@@ -2715,6 +2775,7 @@ function loadSample(){
 show((location.hash || "").slice(1));
 loadLocalDocuments();
 (async () => { mcp = await window.claude?.use?.("mcp"); })();
+(async () => { assetsNs = await window.claude?.use?.("assets"); renderEmailCv(); })();
 (async () => {
   db = await window.claude?.use?.("db");
   if (!db){ loadSample(); return; }
@@ -2733,6 +2794,7 @@ loadLocalDocuments();
       if (x.status === "sent" && k.startsWith("cold:")){ const pid = k.slice(5); const p = prospects.find(q => q.id === pid); if (p && (p.status || "New") === "New") prospectAction("em", pid); } });
     render();
   }, () => {});
+  db.doc("settings/cv").onSnapshot(x => { emailCv = x.exists ? x.data() : null; renderEmailCv(); render(); }, () => {});
   db.doc("triage/done").onSnapshot(x => { doneMap = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
   db.doc("triage/dismissed").onSnapshot(x => { dismissed = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
   db.collection("prospects").onSnapshot(snap => { prospects = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); }, () => {});
