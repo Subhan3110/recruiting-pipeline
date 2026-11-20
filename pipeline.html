@@ -761,6 +761,7 @@ tr:hover td{background:color-mix(in srgb,var(--ring) 27%,var(--surface))}
 .company-card small{font-size:11px;position:relative}
 .company-card:hover{transform:translateY(-3px);box-shadow:0 13px 29px rgba(59,48,123,.095)}
 .btn{font-weight:700;border-radius:10px;padding:9px 13px}
+.more-btn{display:block;width:100%;margin:10px 0 4px;text-align:center}
 .btn.primary{box-shadow:none}
 .btn:hover:not(:disabled){transform:translateY(-1px)}
 input,select,textarea{border-radius:10px}
@@ -2060,9 +2061,16 @@ function renderTable(v){
   }
 }
 
-function render(){
-  drafts.clear();
-  DUPS = dupPairs();
+let renderQueued = false;
+function render(){ if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; renderNow(); }); }
+let dupsSig = null;
+function dupsSignature(){
+  const f = r => r.id + "|" + (r.status || "") + "|" + (r.name || "") + "|" + (r.firm || "") + "|" + (r.emailGuess || r.address || "") + "|" + (r.profileUrl || r.profile || "") + "|" + (r.channel || "");
+  return state.outreach.map(f).join(";") + "#" + prospects.map(f).join(";") + "#" + Object.keys(dismissed).length + "#" + [...dupSwap].join(",");
+}
+function renderNow(){
+  drafts.clear(); lazyBodies.clear();
+  const sig = dupsSignature(); if (sig !== dupsSig){ dupsSig = sig; DUPS = dupPairs(); }
   renderStats();
   if (view === "overview") renderOverview();
   else if (view === "profile") renderProfile();
@@ -2070,8 +2078,8 @@ function render(){
   if (view === "applications"){ appFunnel("fn-ap"); renderTriage("ap"); renderSuggestionReview(); }
   if (view === "linkedin") outFunnel("fn-li", ofCh("LinkedIn"));
   if (view === "email") outFunnel("fn-em", ofCh("Email"));
-  if (view === "linkedin"){ renderTriage("li"); renderProspects(); }
-  if (view === "email"){ renderTriage("em"); renderProspects(); }
+  if (view === "linkedin"){ renderTriage("li"); renderProspects("li"); }
+  if (view === "email"){ renderTriage("em"); renderProspects("em"); }
 }
 
 /* ---------- writes ---------- */
@@ -2362,8 +2370,10 @@ const split = (left, right) => right ? `<div class="split"><div class="l">${left
 const triSel = {li:null, em:null};
 const openKeys = new Set();
 const TRASH_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>`;
+const lazyBodies = new Map();
 function item(key, head, body, trash){
   const k = esc(key);
+  if (typeof body === "function"){ if (openKeys.has(key)) body = body(); else { lazyBodies.set(key, body); body = ""; } }
   const t = trash ? `<button class="trash" data-trash="${esc(trash)}" title="Remove" aria-label="Remove">${TRASH_SVG}</button>` : "";
   return `<details class="it" data-key="${k}"${openKeys.has(key) ? " open" : ""}><summary>${head}${t}</summary><div class="body">${body}</div></details>`;
 }
@@ -2388,7 +2398,8 @@ function showToast(msg, undoFn){
   document.body.appendChild(el); undoTimer = setTimeout(() => el.remove(), 8000);
 }
 document.addEventListener("click", e => { const b = e.target.closest("button.trash"); if (!b) return; e.preventDefault(); e.stopPropagation(); trashIt(b.dataset.trash); }, true);
-document.addEventListener("toggle", e => { const d = e.target; if (d.matches?.("details.it, details.cat")) { d.open ? openKeys.add(d.dataset.key) : openKeys.delete(d.dataset.key); } }, true);
+document.addEventListener("toggle", e => { const d = e.target; if (d.matches?.("details.it, details.cat")) { d.open ? openKeys.add(d.dataset.key) : openKeys.delete(d.dataset.key);
+  if (d.open && lazyBodies.has(d.dataset.key)){ const b = d.querySelector(":scope > .body"); if (b && !b.childElementCount) b.innerHTML = lazyBodies.get(d.dataset.key)(); } } }, true);
 
 const FAM_LABEL = {REFERRAL:"Referral", SCHOOL:"School", PATH:"Career path", TEAM:"Team / topic"};
 const CONN_LABEL = {referral:"referral", warm:"warm", mutual:"mutual contact", alumni:"alumni", employer:"same past employer", nordic:"Nordic link", cold:"cold", unknown:"unknown"};
@@ -2515,8 +2526,10 @@ function dupPairs(){
   return out;
 }
 const dupSwap = new Set();
+let dupIdx = null, dupIdxFor = null;
 function dupOf(p){
-  const x = DUPS.find(d => d.sure && d.drop.col === "prospects" && d.drop.rec.id === p.id);
+  if (dupIdxFor !== DUPS){ dupIdxFor = DUPS; dupIdx = new Map(); for (const d of DUPS) if (d.sure && d.drop.col === "prospects" && !dupIdx.has(d.drop.rec.id)) dupIdx.set(d.drop.rec.id, d); }
+  const x = dupIdx.get(p.id);
   if (!x) return null;
   const k = x.keep.rec;
   return {pair:x, text: x.keep.col === "outreach" ? `already in ${k.channel || "LinkedIn"} outreach as ${k.status}${k.sent ? " (" + fmt(k.sent) + ")" : ""}` : `also listed as ${k.name}, ${k.firm || ""} (${k.status || "New"})`};
@@ -2654,21 +2667,29 @@ function prospectBody(p, ch){
   return split(left, right);
 }
 const byRelevance = (a, b) => REL_RANK[relevance(a).level] - REL_RANK[relevance(b).level] || (!!b.connected - !!a.connected) || String(b.foundAt || "").localeCompare(String(a.foundAt || ""));
-function renderProspects(){
-  const open = prospects.filter(p => (p.status || "New") === "New").sort(byRelevance);
+const PAGE = 40, shown = {li: PAGE, em: PAGE};
+const moreBtn = (k, total) => total > shown[k] ? `<button class="btn more-btn" data-more="${k}">Show ${Math.min(PAGE, total - shown[k])} more (${total - shown[k]} left)</button>` : "";
+document.addEventListener("click", e => { const b = e.target.closest("button[data-more]"); if (!b) return; shown[b.dataset.more] += PAGE; render(); });
+function renderProspects(which){
+  const relCache = new Map(); const rel = p => { let r = relCache.get(p.id); if (!r){ r = REL_RANK[relevance(p).level]; relCache.set(p.id, r); } return r; };
+  const open = prospects.filter(p => (p.status || "New") === "New").sort((a, b) => rel(a) - rel(b) || (!!b.connected - !!a.connected) || String(b.foundAt || "").localeCompare(String(a.foundAt || "")));
+  if (which === "li"){
   const openLi = open.filter(p => !p.emailOnly && firmPass("linkedin", p));
-  $("pros-li").innerHTML = openLi.length ? openLi.map(p => item("p:" + p.id,
+  $("pros-li").innerHTML = openLi.length ? openLi.slice(0, shown.li).map(p => item("p:" + p.id,
       `<strong>${relBadge(p)}<span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}${p.connected ? '<span class="conn" title="Already connected on LinkedIn" aria-label="Connected">✓</span>' : ""}${dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${firmTitle(p.firm, p.title)}</span><span class="g">${esc(p.why)}</span>${p.emailGuess ? `<span class="conf ${emailStatus(p).cls}">@</span>` : ""}`,
-      prospectBody(p, "LinkedIn"), "p:" + p.id)).join("")
+      () => prospectBody(p, "LinkedIn"), "p:" + p.id)).join("")
     : `<p class="empty-note">No new people yet. Check LinkedIn finds 6 relevant bankers each run.</p>`;
+  $("pros-li").innerHTML += moreBtn("li", openLi.length);
   $("pros-li").innerHTML += doneList(prospects.filter(p => !p.emailOnly && firmPass("linkedin", p) && p.status && p.status !== "New" && p.status !== "Merged"), "li");
+  return; }
   const rows = [...open.filter(p => p.emailGuess || p.emailBody).map(p => ({...p, kind:"p"})), ...ofCh("Email").filter(r => r.emailGuess && !r.address && !dismissed["eo:" + r.id]).map(r => ({...r, kind:"o"}))].filter(p => firmPass("email", p));
-  $("pros-em").innerHTML = rows.length ? rows.map(p => item("e:" + p.id,
+  $("pros-em").innerHTML = rows.length ? rows.slice(0, shown.em).map(p => item("e:" + p.id,
       `<strong>${p.kind === "p" ? relBadge(p) : ""}<span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}${p.kind === "p" && dupOf(p) ? '<span class="dup" title="Possible duplicate">dup?</span>' : ""}</strong><span class="m">${firmTitle(p.firm, p.title)}</span><span class="g addr-i">${esc(p.emailGuess || "no address yet")}</span><span class="conf ${emailStatus(p).cls}">${emailStatus(p).label}</span>`,
-      p.kind === "p" ? prospectBody(prospects.find(x => x.id === p.id) || p, "Email") :
-      split(`${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}
+      p.kind === "p" ? () => prospectBody(prospects.find(x => x.id === p.id) || p, "Email") :
+      () => split(`${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}
        <div class="acts"><button class="btn primary" data-oact="confirm" data-pid="${p.id}">Use this address</button></div>`, draftBox("Cold email", p.emailBody, p.emailSubject, null)), p.kind === "p" ? "p:" + p.id : "d:eo:" + p.id)).join("")
     : `<p class="empty-note">No addresses yet. Check email looks up each firm's email format and says how sure it is: Verified, Strong, Probable or Unknown.</p>`;
+  $("pros-em").innerHTML += moreBtn("em", rows.length);
   $("pros-em").innerHTML += doneList(prospects.filter(p => (p.emailGuess || p.emailBody) && firmPass("email", p) && p.status && p.status !== "New" && p.status !== "Merged"), "em");
 }
 /* people already contacted or skipped: kept so the address and draft are never lost */
@@ -2677,7 +2698,7 @@ function doneList(list, k){
   const key = "done:" + k;
   return `<details class="cat" data-key="${key}" style="--c:var(--s-cold)"${openKeys.has(key) ? " open" : ""}><summary><span class="cl">Contacted or skipped</span><span class="cs">Address and message kept here</span><b>${list.length}</b></summary><div class="ilist">${list.map(p => item("pd:" + k + ":" + p.id,
     `<strong><span class="nm">${esc(p.name)}</span>${firmTag(p.firm)}${countryChip(p)}<span class="tag">${esc(p.status)}</span></strong><span class="m">${esc(p.firm || "")}</span><span class="g ${k === "em" ? "addr-i" : ""}">${esc(k === "em" ? (p.emailGuess || "") : (p.why || ""))}</span>`,
-    split(`${countryEditor(p)}${k === "em" ? emailLine(p) : `<p class="gist">${esc(p.why || "")}</p>`}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn" data-pact="undo" data-pid="${p.id}">Move back to new</button></div>`,
+    () => split(`${countryEditor(p)}${k === "em" ? emailLine(p) : `<p class="gist">${esc(p.why || "")}</p>`}<div class="acts">${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}<button class="btn" data-pact="undo" data-pid="${p.id}">Move back to new</button></div>`,
       k === "em" ? draftBox("Cold email", p.emailBody, p.emailSubject) : draftBox(p.connected ? "Message" : "Connection note", p.liDraft)))).join("")}</div></details>`;
 }
 async function prospectAction(act, id){
