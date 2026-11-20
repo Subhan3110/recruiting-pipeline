@@ -1118,6 +1118,7 @@ input,select,textarea{border-radius:10px}
           <div class="profile-panel-title"><h3>CV on emails</h3><span>Attached when you press Send</span></div>
           <div id="email-cv"><p class="empty-note">Loading…</p></div>
           <input class="doc-upload-input" id="email-cv-file" type="file" accept=".pdf,application/pdf">
+          <input class="doc-upload-input" id="email-cv-sales-file" type="file" accept=".pdf,application/pdf">
         </div>
         <div class="panel-box">
           <div class="profile-panel-title"><h3>Reusable candidate brief</h3><span>AI-ready</span></div>
@@ -2197,7 +2198,7 @@ function draftBox(label, text, subject, ctx){
       <button class="btn primary" data-msent="${esc(key)}">Done, mark sent</button></div></div>`;
   const statusLine = sent ? `<div class="sline ok">Sent ✓ ${esc(st?.at ? new Date(st.at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "")}</div>`
     : st?.status === "failed" ? `<div class="sline err">Not sent: ${esc(st.error || "unknown reason")}. Fix it and press Send again.</div>` : "";
-  const cvBox = key && ctx?.channel === "Email" ? `<label class="cvchk"><input type="checkbox" data-attachcv="${esc(key)}"${wantsCv(key, ctx) ? " checked" : ""}> Attach CV${cvName() ? " (" + esc(cvName()) + ")" : " (none uploaded yet)"}</label>` : "";
+  const cvBox = key && ctx?.channel === "Email" ? `<label class="cvchk"><input type="checkbox" data-attachcv="${esc(key)}"${wantsCv(key, ctx) ? " checked" : ""}> Attach CV${cvName(ctx.cvKind) ? " (" + esc(cvName(ctx.cvKind)) + ")" : " (none uploaded yet)"}</label>` : "";
   const confirmLine = key && confirming.has(key) ? `<div class="sconfirm">Send this to <b>${esc(ctx.name)}</b> on ${esc(ctx.channel)}${ctx.to ? " (" + esc(ctx.to) + ")" : ""}? It goes out exactly as written.
       ${cvBox}<button class="btn primary" data-send-yes="${esc(key)}">Confirm send</button><button class="btn" data-send-no="${esc(key)}">Cancel</button></div>` : "";
   const body = key && draftEditing.has(key) ? `<textarea class="dedit" data-edtext="${esc(key)}" rows="${Math.max(6, text.split("\n").length + 1)}">${esc(text)}</textarea>` : `<pre>${esc(text)}</pre>`;
@@ -2223,16 +2224,19 @@ async function fireSend(key){
    Falls back to the newest CV saved in this browser under Profile & Docs. */
 let emailCv = null, assetsNs = null, cvBusy = false;
 const attachCv = new Map();            // per draft: true/false; default on for new emails, off for thread replies
+const salesRole = p => /sales|trad|broker|brok|megl|structur|\bs&t\b|execution|desk|flow/i.test((p.title || "") + " " + (p.division === "Markets" ? "sales" : ""));
 const wantsCv = (key, c) => attachCv.has(key) ? attachCv.get(key) : !c.threadId;
 async function blobToB64(blob){
   const buf = new Uint8Array(await blob.arrayBuffer()); let s = "";
   for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
   return btoa(s);
 }
-async function cvAttachment(){
-  if (emailCv?.assetId){
-    const r = await fetch("/_blob/" + emailCv.assetId);
-    if (r.ok) return {content: await blobToB64(await r.blob()), filename: emailCv.filename || "CV.pdf", mimeType: "application/pdf"};
+async function cvAttachment(kind){
+  const useSales = kind === "sales" && emailCv?.salesAssetId;
+  const id = useSales ? emailCv.salesAssetId : emailCv?.assetId;
+  if (id){
+    const r = await fetch("/_blob/" + id);
+    if (r.ok) return {content: await blobToB64(await r.blob()), filename: (useSales ? emailCv.salesFilename : emailCv.filename) || "CV.pdf", mimeType: "application/pdf"};
   }
   const local = localDocuments.filter(d => d.category === "CV").sort((a,b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0];
   if (local && localDocsDB){
@@ -2241,28 +2245,32 @@ async function cvAttachment(){
   }
   return null;
 }
-function cvName(){ return emailCv?.filename || localDocuments.find(d => d.category === "CV")?.fileName || ""; }
+function cvName(kind){ if (kind === "sales" && emailCv?.salesAssetId) return (emailCv.salesFilename || "Sales CV") + ", sales version"; return emailCv?.filename || localDocuments.find(d => d.category === "CV")?.fileName || ""; }
 function renderEmailCv(){
   const el = $("email-cv"); if (!el) return;
   const name = cvName();
-  el.innerHTML = `<p class="profile-tip">${name ? `<strong>${esc(name)}</strong> is attached to new emails you send from the tracker${emailCv?.uploadedAt ? " · updated " + esc(docDate(emailCv.uploadedAt)) : ""}.` : "No CV yet. Upload a PDF and it goes with every new email you send from here."}</p>
-    ${assetsNs ? `<div class="acts" style="margin-top:12px"><label for="email-cv-file" class="btn${name ? "" : " primary"}" style="display:inline-block">${cvBusy ? "Uploading…" : name ? "Replace CV" : "Upload CV (PDF)"}</label></div>` : ""}
+  const sname = emailCv?.salesAssetId ? (emailCv.salesFilename || "Sales CV") : "";
+  el.innerHTML = `<p class="profile-tip">${name ? `<strong>Main CV:</strong> ${esc(name)}, attached to new emails${emailCv?.uploadedAt ? " · updated " + esc(docDate(emailCv.uploadedAt)) : ""}.` : "No CV yet. Upload a PDF and it goes with every new email you send from here."}</p>
+    <p class="profile-tip"><strong>Sales CV:</strong> ${sname ? esc(sname) + ", used instead for people in sales, trading and broking" + (emailCv?.salesUploadedAt ? " · updated " + esc(docDate(emailCv.salesUploadedAt)) : "") + "." : "none. Upload one to send a sales-focused CV to sales and trading people."}</p>
+    ${assetsNs ? `<div class="acts" style="margin-top:12px"><label for="email-cv-file" class="btn${name ? "" : " primary"}" style="display:inline-block">${cvBusy === "main" ? "Uploading…" : name ? "Replace main CV" : "Upload CV (PDF)"}</label><label for="email-cv-sales-file" class="btn" style="display:inline-block">${cvBusy === "sales" ? "Uploading…" : sname ? "Replace sales CV" : "Upload sales CV"}</label></div>` : ""}
     <p class="tri-meta" id="email-cv-note" aria-live="polite"></p>`;
 }
-async function uploadEmailCv(file){
+async function uploadEmailCv(file, kind = "main"){
   if (!file || !assetsNs || !db) return;
   if (!/\.pdf$/i.test(file.name)) { $("email-cv-note").textContent = "Upload the CV as a PDF."; return; }
-  cvBusy = true; renderEmailCv();
+  cvBusy = kind; renderEmailCv();
   try {
     const up = await assetsNs.upload(file, {type: "application/pdf"});
-    await db.doc("settings/cv").set({assetId: up.id, filename: file.name, sizeBytes: up.sizeBytes, uploadedAt: new Date().toISOString()});
+    const now = new Date().toISOString();
+    const patch = kind === "sales" ? {salesAssetId: up.id, salesFilename: file.name, salesUploadedAt: now} : {assetId: up.id, filename: file.name, sizeBytes: up.sizeBytes, uploadedAt: now};
+    await (emailCv ? db.doc("settings/cv").update(patch) : db.doc("settings/cv").set(patch));
     cvBusy = false; renderEmailCv(); $("email-cv-note").textContent = "Saved. New emails now carry this CV.";
   } catch(e){
     cvBusy = false; renderEmailCv();
     $("email-cv-note").textContent = e?.code === "too_large" ? "That file is too big." : e?.code === "unsupported_type" ? "Upload the CV as a PDF." : "Could not upload the CV (" + (e?.code || "error") + ").";
   }
 }
-document.addEventListener("change", e => { if (e.target.id === "email-cv-file"){ uploadEmailCv(e.target.files?.[0]); e.target.value = ""; }
+document.addEventListener("change", e => { if (e.target.id === "email-cv-file" || e.target.id === "email-cv-sales-file"){ uploadEmailCv(e.target.files?.[0], e.target.id === "email-cv-sales-file" ? "sales" : "main"); e.target.value = ""; }
   const k = e.target.dataset?.attachcv; if (k){ attachCv.set(k, e.target.checked); } });
 /* Email: the page sends straight from the viewer's own Gmail, right after the click and the confirm. */
 const isEmail = s => /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(s || "");
@@ -2273,7 +2281,7 @@ async function sendEmailDirect(key, c, text, logId){
   let res, extra = {};
   if (wantsCv(key, c)){
     let att = null;
-    try { att = await cvAttachment(); } catch(e){}
+    try { att = await cvAttachment(c.cvKind); } catch(e){}
     if (!att) return fail("no CV to attach. Upload it under Profile & Docs, or untick Attach CV");
     extra = {attachments: [att]};
   }
@@ -2641,7 +2649,7 @@ function prospectBody(p, ch){
   const email = ch === "Email";
   const acts = `<div class="acts">${p.sourceUrl ? `<a class="btn" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener">Source</a>` : ""}${p.profileUrl ? `<a class="btn" href="${esc(p.profileUrl)}" target="_blank" rel="noopener">Open profile</a>` : ""}${email ? `<button class="btn primary" data-pact="em" data-pid="${p.id}">Sent by email</button>` : `<button class="btn primary" data-pact="li" data-pid="${p.id}">Sent on LinkedIn</button>`}<button class="btn" data-pact="skip" data-pid="${p.id}">Skip</button><button class="btn dnc" data-pact="dnc" data-pid="${p.id}">Do not contact</button></div>`;
   const left = `<p class="gist">${esc(p.why || "")}${p.location ? " · " + esc(p.location) : ""}</p>${relWhy(p)}${dupNote(p)}${mergeNote(p)}${pitchMeta(p)}${countryEditor(p)}${emailLine(p)}${acts}`;
-  const right = email ? draftBox("Cold email", p.emailBody, p.emailSubject, p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess} : null)
+  const right = email ? draftBox("Cold email", p.emailBody, p.emailSubject, p.emailGuess ? {key: "cold:" + p.id, channel: "Email", name: p.name, firm: p.firm, to: p.emailGuess, cvKind: salesRole(p) ? "sales" : "main"} : null)
     : p.connected ? draftBox("Message", p.liDraft, "", {key: "pros:" + p.id, channel: "LinkedIn", name: p.name, firm: p.firm, profileUrl: p.profileUrl}) : draftBox("Connection note", p.liDraft);
   return split(left, right);
 }
