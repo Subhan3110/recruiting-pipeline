@@ -2194,6 +2194,10 @@ function draftBox(label, text, subject, ctx){
   const id = "d" + (++draftSeq); drafts.set(id, (subject ? "Subject: " + subject + "\n\n" : "") + text);
   const st = key ? sendState.get(key) : null;
   const sent = st?.status === "sent" || (key && doneMap[key]);
+  const sch = key && !sent ? scheduledMap.get(key) : null;
+  if (sch && sch.status !== "failed") return `<div class="draft"><div class="dh"><b>${esc(label)}</b><span class="dtools"><button class="copy" data-copy="${id}">Copy</button></span></div>${subject ? `<div class="subj">${esc(subject)}</div>` : ""}<pre>${esc(sch.text || text)}</pre>
+    <div class="sconfirm">${sch.status === "sending" ? "Sending now…" : `Scheduled: goes to <b>${esc(sch.to || "")}</b> ${esc(schedLabel(sch.sendDate))} at 08:57${sch.attachCv ? ", with CV" : ""}.`}
+      ${sch.status === "queued" ? `<button class="btn" data-unsched="${esc(key)}">Cancel</button>` : ""}</div></div>`;
   let tools = `<button class="copy" data-copy="${id}">Copy</button>`;
   if (key && !sent){
     tools = (draftEditing.has(key) ? `<button class="copy" data-edone="${esc(key)}">Done</button>` : `<button class="copy" data-edit-draft="${esc(key)}">Edit</button>`) + tools +
@@ -2205,18 +2209,60 @@ function draftBox(label, text, subject, ctx){
     <div class="sconfirm">${st.copied ? "Copied. In LinkedIn: click the message box, paste (⌘V) and press Send." : "Select the text above, copy it, then paste it in LinkedIn and press Send."}
       <button class="btn primary" data-msent="${esc(key)}">Done, mark sent</button></div></div>`;
   const statusLine = sent ? `<div class="sline ok">Sent ✓ ${esc(st?.at ? new Date(st.at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "")}</div>`
-    : st?.status === "failed" ? `<div class="sline err">Not sent: ${esc(st.error || "unknown reason")}. Fix it and press Send again.</div>` : "";
+    : st?.status === "failed" ? `<div class="sline err">Not sent: ${esc(st.error || "unknown reason")}. Fix it and press Send again.</div>`
+    : sch?.status === "failed" ? `<div class="sline err">Scheduled send failed: ${esc(sch.error || "unknown reason")}. Press Send to try again.</div>` : "";
   const cvBox = key && ctx?.channel === "Email" ? `<label class="cvchk"><input type="checkbox" data-attachcv="${esc(key)}"${wantsCv(key, ctx) ? " checked" : ""}> Attach CV${cvName(ctx.cvKind) ? " (" + esc(cvName(ctx.cvKind)) + ")" : " (none uploaded yet)"}</label>` : "";
   const confirmLine = key && confirming.has(key) ? `<div class="sconfirm">Send this to <b>${esc(ctx.name)}</b> on ${esc(ctx.channel)}${ctx.to ? " (" + esc(ctx.to) + ")" : ""}? It goes out exactly as written.
-      ${cvBox}<button class="btn primary" data-send-yes="${esc(key)}">Confirm send</button><button class="btn" data-send-no="${esc(key)}">Cancel</button></div>` : "";
+      ${cvBox}<button class="btn primary" data-send-yes="${esc(key)}">Send now</button>${ctx.channel === "Email" ? `<button class="btn primary" data-sched="${esc(key)}">Send ${esc(schedLabel(nextSendDate()))} at 08:57</button>` : ""}<button class="btn" data-send-no="${esc(key)}">Cancel</button></div>` : "";
   const body = key && draftEditing.has(key) ? `<textarea class="dedit" data-edtext="${esc(key)}" rows="${Math.max(6, text.split("\n").length + 1)}">${esc(text)}</textarea>` : `<pre>${esc(text)}</pre>`;
   return `<div class="draft"><div class="dh"><b>${esc(label)}</b><span class="dtools">${tools}</span></div>${subject ? `<div class="subj">${esc(subject)}</div>` : ""}${body}${confirmLine}${statusLine}</div>`;
+}
+/* Scheduled send: the email is queued in db "scheduled"; a scheduled task sends queued emails at 08:57 London time on weekdays. */
+const scheduledMap = new Map();
+function londonToday(){ return new Intl.DateTimeFormat("en-CA", {timeZone: "Europe/London"}).format(new Date()); }
+function nextSendDate(){
+  const now = new Date();
+  const hm = new Intl.DateTimeFormat("en-GB", {timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false}).format(now);
+  let d = new Date(londonToday() + "T12:00:00Z");
+  const wd = x => x.getUTCDay();
+  if (hm >= "08:50" || wd(d) === 0 || wd(d) === 6) d.setUTCDate(d.getUTCDate() + 1);
+  while (wd(d) === 0 || wd(d) === 6) d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+function schedLabel(date){
+  if (!date) return "";
+  if (date === londonToday()) return "today";
+  const t = new Date(londonToday() + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + 1);
+  if (date === t.toISOString().slice(0, 10)) return "tomorrow";
+  return new Date(date + "T12:00:00Z").toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short", timeZone: "UTC"});
+}
+async function scheduleSend(key){
+  const c = sendCtx.get(key); if (!c) return;
+  const text = edits.get(key) || "";
+  confirming.delete(key);
+  const fail = msg => { sendState.set(key, {status:"failed", error:msg}); render(); };
+  if (!db) return fail("open the tracker in claude.ai to schedule");
+  if (!text.trim()) return fail("the draft is empty");
+  if (isDNC(c.name, c.to)) return fail("this person is marked Do not contact");
+  if (!c.threadId && !isEmail(c.to)) return fail("no email address on this person");
+  const attach = wantsCv(key, c);
+  if (attach && !(c.cvKind === "sales" ? (emailCv?.salesAssetId || emailCv?.assetId) : emailCv?.assetId)) return fail("no CV uploaded under Profile & Docs, or untick Attach CV");
+  const doc = {status:"queued", key, name:c.name, firm:c.firm || "", to:(c.to || "").trim(), subject:c.subject || "", text, threadId:c.threadId || "",
+    attachCv: attach, cvKind: c.cvKind || "main", sendDate: nextSendDate(), queuedAt: new Date().toISOString(), error:""};
+  scheduledMap.set(key, doc); sendState.delete(key); render();
+  try { await db.collection("scheduled").doc(safeId(key)).set(doc); }
+  catch(e){ scheduledMap.delete(key); fail("could not schedule, try again"); }
+}
+async function unschedule(key){
+  const cur = scheduledMap.get(key); if (!cur || cur.status !== "queued") return;
+  scheduledMap.delete(key); render();
+  try { await db.collection("scheduled").doc(safeId(key)).delete(); } catch(e){ scheduledMap.set(key, cur); render(); setSave(false, "Not saved, try again"); }
 }
 async function fireSend(key){
   const c = sendCtx.get(key); if (!c) return;
   const text = edits.get(key) || "";
   const logId = safeId(key) + "-" + Date.now().toString(36);
-  confirming.delete(key); sendState.set(key, {status:"sending", logId}); render();
+  confirming.delete(key); sendState.set(key, {status:"sending", logId}); if (scheduledMap.get(key)?.status === "failed"){ scheduledMap.delete(key); if (db) db.collection("scheduled").doc(safeId(key)).delete().catch(() => {}); } render();
   if (!mcp){ sendState.set(key, {status:"failed", error:"open the tracker in claude.ai to send"}); render(); return; }
   if (isDNC(c.name, c.to)){ sendState.set(key, {status:"failed", error:"this person is marked Do not contact"}); render(); return; }
   if (c.channel === "Email") return sendEmailDirect(key, c, text, logId);
@@ -2337,6 +2383,8 @@ document.addEventListener("click", e => {
   else if (t.dataset.send){ draftEditing.delete(t.dataset.send); confirming.add(t.dataset.send); render(); }
   else if (t.dataset.sendNo){ confirming.delete(t.dataset.sendNo); render(); }
   else if (t.dataset.sendYes) fireSend(t.dataset.sendYes);
+  else if (t.dataset.sched) scheduleSend(t.dataset.sched);
+  else if (t.dataset.unsched) unschedule(t.dataset.unsched);
 });
 document.querySelectorAll("[data-tri]").forEach(el => { const k = el.dataset.tri, s = SRC[k];
   el.innerHTML = `<div class="tri-head"><div><h2>${s.title}</h2><p class="tri-meta" id="tri-meta-${k}">Not checked yet.</p></div><button class="btn primary" data-run="${k}" id="tri-run-${k}">${s.btn}</button></div>
@@ -2823,6 +2871,7 @@ loadLocalDocuments();
       if (x.status === "sent" && k.startsWith("cold:")){ const pid = k.slice(5); const p = prospects.find(q => q.id === pid); if (p && (p.status || "New") === "New") prospectAction("em", pid); } });
     render();
   }, () => {});
+  db.collection("scheduled").onSnapshot(snap => { scheduledMap.clear(); snap.docs.forEach(d => { const x = d.data(); if (x.key && x.status !== "sent") scheduledMap.set(x.key, x); }); render(); }, () => {});
   db.doc("settings/cv").onSnapshot(x => { emailCv = x.exists ? x.data() : null; renderEmailCv(); render(); }, () => {});
   db.doc("triage/done").onSnapshot(x => { doneMap = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
   db.doc("triage/dismissed").onSnapshot(x => { dismissed = x.exists ? (x.data().items || {}) : {}; render(); }, () => {});
