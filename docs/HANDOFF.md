@@ -53,7 +53,10 @@ Everything is still dry run: nothing has been submitted. A first live submission
 
 ## Shared database (2026-11-21)
 Owner created a free Supabase project (West EU, Data API off). Cloud sessions cannot reach Postgres (HTTPS-only egress, DNS for database hosts does not resolve), so the agent will run on the owner's computer:
-see `docs/LOCAL_SETUP.md`. `python -m jobagent backup --portable` + `restore` moves the data to a database with a new master key (verified into a local PostgreSQL). Not yet done: the owner has not run it, `doctor` has not been run against Supabase.
+see `docs/LOCAL_SETUP.md`. `python -m jobagent backup --portable` + `restore` moves the data to a database with a new master key (verified into a local PostgreSQL). Done 2026-11-21 by a local Claude session on the owner's Mac (reported to this session with a screenshot): restore into Supabase
+(4,335 vacancies, 21,662 evaluations, 143 employers, 190 applications, 71 profile facts; 33 unfinished applications sent back to preparation), `doctor` passes
+(database, master key, profile), interface serving on the Mac. **Supabase is now the single source of truth.** The cloud container's SQLite copy is retired and paused.
+Dry run no longer attaches documents on real employer forms (Greenhouse stores attachments on selection); the worker must `git pull` this change before it runs.
 
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.

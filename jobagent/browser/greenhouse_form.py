@@ -29,6 +29,10 @@ class GreenhouseFormSubmitter:
     def __init__(self, allowed_hosts: tuple[str, ...], timeout_ms: int = 45000, headless: bool = True):
         self.allowed_hosts, self.timeout, self.headless = allowed_hosts, timeout_ms, headless
 
+    @staticmethod
+    def _is_local(url: str) -> bool:
+        return urlsplit(url).hostname in ("127.0.0.1", "localhost")
+
     def _host_ok(self, url: str) -> bool:
         u = urlsplit(url)
         return (u.hostname or "") in self.allowed_hosts and (u.scheme == "https" or u.hostname in ("127.0.0.1", "localhost"))
@@ -71,7 +75,14 @@ class GreenhouseFormSubmitter:
                 self._combobox(page, "country", package["phone_country"], prefix=True)
             except Exception:  # noqa: BLE001
                 problems.append("phone country selector")
+        dry = getattr(hooks, "mode", "dry_run") != "live"
         for a in package["answers"]:
+            # Greenhouse uploads an attached file to its storage at once, even if the form is never submitted.
+            # In dry run on a real employer form, check the file input exists but do not attach anything.
+            if dry and a["type"] == "input_file" and not self._is_local(page.url):
+                if not page.locator(_css_id(a["field"])).count():
+                    problems.append(f"{a['label'][:60]}: file input not found")
+                continue
             try:
                 self._fill(page, a, package)
                 filled += 1
