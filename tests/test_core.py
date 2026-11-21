@@ -566,3 +566,21 @@ def test_written_letters_are_fact_checked_and_attached(conn):
     apps.prepare(conn, app["id"], FakeAdapter())
     meta, _ = documents.load(conn, apps.version(conn, app["id"])["document_ids"]["cover_letter"])
     assert meta["meta"]["text"] == good.strip()
+
+
+def test_yes_no_questions_employer_answers_and_multi_country_sponsorship(conn):
+    seed_profile(conn, work_auth=())
+    profile.set_fact(conn, "work_auth/EEA", {"authorised": True, "needs_sponsorship": False}, "confirmed", "user")
+    profile.set_fact(conn, "work_auth/OTHER", {"authorised": False, "needs_sponsorship": True}, "confirmed", "user")
+    yn = [{"label": "Yes", "value": 1}, {"label": "No", "value": 0}]
+    q = lambda label, name: {"label": label, "required": True, "description": "", "fields": [{"name": name, "type": "multi_value_single_select", "options": yn}]}  # noqa: E731
+    form = {"questions": [q("Have you enrolled in WorldQuant University in the past 12 months?", "wq"),
+                          q("Have you completed coursework in accounting, financial reporting, U.S. GAAP?", "cb"),
+                          q("Will you require visa sponsorship?", "sp")]}
+    answers.set_answer(conn, "q:have you enrolled in worldquant university in the past 12 months", "No", "employer", "e1", source="user")
+    answers.set_answer(conn, "q:have you completed coursework in accounting financial reporting u s gaap", "Yes", "employer", "e1", source="user")
+    answers.set_answer(conn, "sponsorship:?", "Yes", "employer", "e1", source="user")   # an employer-wide visa answer is ignored
+    got = lambda cc: {a["field"]: a["value"] for a in answers.resolve_form(conn, form, {"employer_id": "e1"}, {"countries": cc})["answers"]}  # noqa: E731
+    assert got(["HK", "CN"]) == {"wq": "No", "cb": "Yes", "sp": "Yes"}        # both countries need sponsorship
+    assert got(["NL"])["sp"] == "No"                                          # Amsterdam office of the same employer
+    assert "sp" not in got(["NL", "HK"])                                     # countries disagree: ask, never guess

@@ -246,6 +246,10 @@ CURRENCY = {"US": "USD", "GB": "GBP", "IN": "INR", "CH": "CHF", "SE": "SEK", "NO
             "AE": "AED", "SA": "SAR", "BR": "BRL", "CA": "CAD", "SG": "SGD", "HK": "HKD", "JP": "JPY", "AU": "AUD", "ZA": "ZAR", "MX": "MXN",
             "CN": "CNY", "IL": "ILS", "TR": "TRY", "RO": "RON", "BG": "BGN"}
 EUROZONE = {"AT", "BE", "HR", "CY", "EE", "FI", "FR", "DE", "GR", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PT", "SK", "SI", "ES"}
+VALUE_KEYS = {"university", "field_of_study", "degree_level", "gpa", "current_location", "languages_other", "graduation_year", "graduation_month",
+              "current_employer", "current_title", "experience_years", "address", "linkedin", "website", "country", "nationality",
+              "residence_country", "current_region", "start_date", "salary_expectation", "current_industry"}
+YES_NO_LABELS = {"yes", "no", "undecided", "not sure", "maybe", "n/a", "unsure"}
 COMPLETED = re.compile(r"\bcompleted\b|obtain|earned|attained|highest|achieved|graduated from", re.I)
 
 
@@ -394,6 +398,9 @@ def resolve_form(conn: Conn, form: dict, vacancy: dict, geo_eval: dict, strict: 
             continue  # set by the page itself (e.g. coordinates from the location autocomplete)
         base = fname if fname in BUILTIN else None
         key, country = (base, None) if base else classify(q["label"], countries)
+        # A Yes/No question is never asking for a profile value: "Have you enrolled in WorldQuant University?" is not "Which university?"
+        if options and key in VALUE_KEYS and {_plain(o["label"]) for o in options} <= YES_NO_LABELS:
+            key, country = "q:" + norm_label(q["label"]), None
         entry = {"field": fname, "type": ftype, "label": q["label"], "key": key, "required": q["required"]}
         # Location choice: only eligible places may be selected.
         if key.endswith(":?") and sel_country:
@@ -409,15 +416,25 @@ def resolve_form(conn: Conn, form: dict, vacancy: dict, geo_eval: dict, strict: 
             else:
                 out["missing"].append(entry | {"options": [o["label"] for o in options], "why": "no eligible location among the options"})
             continue
-        text, source = _profile_value(conn, key, country, employer_id, strict, q["label"])
+        # An answer you gave for this employer wins over a value derived from your profile, except for visa questions,
+        # which are always derived per country (an employer-wide answer would be wrong for its other offices).
+        emp = None if key.startswith(("work_auth:", "sponsorship:")) or key == "visa_status" else conn.one(
+            "SELECT * FROM answers WHERE question_key=? AND scope_type='employer' AND scope_value=? AND superseded_at IS NULL"
+            + ("" if not strict else " AND status='confirmed'"), (key, employer_id))
+        if emp:
+            text, source = emp["answer"], f"answer library (employer; {emp['source']})"
+        else:
+            text, source = _profile_value(conn, key, country, employer_id, strict, q["label"])
         if text is not None and key.startswith("sponsorship:") and not options and re.match(r"\s*(if .{0,80},\s*)?(what|which)\b", q["label"], re.I):
             text = "Work visa sponsorship" if YES.match(text) else "None"   # "What sponsorship would you need?" wants a description, not Yes/No
         if text is None and key.endswith(":?") and countries:
-            found = {_profile_value(conn, key[:-1] + cc, cc, employer_id, strict, q["label"]) for cc in countries}
-            if len(found) == 1 and next(iter(found))[0] is not None:
-                text, source = next(iter(found))
+            found = [_profile_value(conn, key[:-1] + cc, cc, employer_id, strict, q["label"]) for cc in countries]
+            values = {v for v, _ in found}
+            if len(values) == 1 and None not in values:   # every listed country gives the same answer
+                text, source = found[0][0], "profile: same answer for " + ", ".join(countries)
         if text is None:
-            lib = lookup(conn, key, employer_id, country or (countries[0] if len(countries) == 1 else None), allow_proposed=not strict)
+            visa = key.startswith(("work_auth:", "sponsorship:")) or key == "visa_status"
+            lib = lookup(conn, key, None if visa else employer_id, country or (countries[0] if len(countries) == 1 else None), allow_proposed=not strict)
             if lib:
                 text, source = lib["answer"], f"answer library ({lib['scope_type']}{':' + lib['scope_value'] if lib['scope_value'] else ''}; {lib['source']})"
         if text is None:
