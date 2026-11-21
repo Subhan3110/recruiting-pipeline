@@ -497,3 +497,20 @@ def test_form_requiring_a_finra_licence_closes_the_application(conn):
     q = FakeAdapter().form("x/1")["questions"] + [{"label": "Active FINRA licenses are REQUIRED for this role. Do you currently hold any?",
         "description": "", "required": True, "fields": [{"name": "question_77", "type": "input_text", "options": []}]}]
     assert apps.prepare(conn, app["id"], FakeAdapter(questions=q))["state"] == "closed"
+
+
+def test_bulk_re_evaluation_matches_one_by_one(conn):
+    from jobagent import pipeline
+    seed_profile(conn)
+    ids = [add_vacancy(conn, title=t, location=l, sid=f"b/{i}", employer=f"Bank {i}")
+           for i, (t, l) in enumerate([("Compliance Analyst Intern", "Amsterdam"), ("Senior Risk Manager", "Paris"),
+                                       ("KYC Analyst", "Singapore"), ("Treasury Analyst", "London"), ("Software Engineer", "Berlin")])]
+    assert pipeline.evaluate_pending(conn) == 5
+    bulk = {r["vacancy_id"]: (r["decision"], r["score"]) for r in conn.q("SELECT * FROM evaluations WHERE is_current=1")}
+    for vid in ids:
+        one = matching.evaluate(conn, vid)
+        assert (one["decision"], one["score"]) == bulk[vid]
+    assert conn.val("SELECT COUNT(*) FROM evaluations WHERE is_current=1") == 5
+    assert pipeline.evaluate_pending(conn) == 0                       # nothing changed: nothing re-evaluated
+    profile.set_fact(conn, "contact/phone", "+47 1", "confirmed", "test")
+    assert pipeline.evaluate_pending(conn) == 5 and conn.val("SELECT COUNT(*) FROM evaluations WHERE is_current=1") == 5

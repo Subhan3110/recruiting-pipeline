@@ -177,7 +177,9 @@ def evaluate(conn: Conn, vacancy_id: str, llm=None) -> dict:
     pv, cfg = policy_mod.current(conn)
     title, desc = v["title"], v["description"] or ""
     home = profile.get_fact(conn, "contact/location")
-    structured = (unj(conn.val("SELECT raw FROM vacancy_sources WHERE vacancy_id=? LIMIT 1", (vacancy_id,)), {}) or {}).get("offices")
+    raw = conn.cache["raw"].get(vacancy_id) if conn.cache is not None and "raw" in conn.cache else \
+        conn.val("SELECT raw FROM vacancy_sources WHERE vacancy_id=? LIMIT 1", (vacancy_id,))
+    structured = (unj(raw, {}) or {}).get("offices")
     # Offices are a board-level grouping and can be broader than the job's own location; trust the job location first.
     g = geo.evaluate(v["location_raw"] or "", None, desc, cfg, home)
     if g["decision"] == "hold" and structured:
@@ -239,6 +241,11 @@ def evaluate(conn: Conn, vacancy_id: str, llm=None) -> dict:
     detail = {"relevance": rel, "checks": checks, "geo": g, "skill_hits": skill_hits, "score_parts": {
         "relevance": rel["points"], "seniority": {"pass": 25, "unknown": 12, "fail": 0}[sen["result"]],
         "skills": min(10, 3 * len(skill_hits))}, "fails": fails, "unknowns": unknowns}
+    if conn.cache is not None and "writes" in conn.cache:  # bulk mode: the caller writes everything in one transaction
+        conn.cache["writes"].append(((new_id("eval"), vacancy_id, now(), pv, score, decision, g["decision"], rationale.strip(), j(detail)),
+                                     (j(g["locations"]), vacancy_id), decision == "hold" and bool(auth.get("unknown"))))
+        return {"vacancy_id": vacancy_id, "score": score, "decision": decision, "geo": g, "rationale": rationale.strip(), "detail": detail,
+                "policy_version": pv}
     with conn.tx():
         conn.q("UPDATE evaluations SET is_current=0 WHERE vacancy_id=? AND is_current=1", (vacancy_id,))
         conn.q("INSERT INTO evaluations (id, vacancy_id, created_at, policy_version, score, decision, geo, rationale, detail) VALUES (?,?,?,?,?,?,?,?,?)",

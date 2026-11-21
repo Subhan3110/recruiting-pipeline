@@ -38,15 +38,32 @@ def retire_fact(conn: Conn, key: str, actor: str = "user"):
     conn.event("profile.fact_retired", "fact", key, actor=actor)
 
 
+def _cached_rows(conn: Conn) -> list[dict] | None:
+    c = conn.cache
+    if c is None:
+        return None
+    if "facts" not in c:
+        c["facts"] = conn.q("SELECT * FROM profile_facts WHERE superseded_at IS NULL ORDER BY key")
+    return c["facts"]
+
+
 def get_fact(conn: Conn, key: str, confirmed_only: bool = False):
-    row = conn.one("SELECT value, status FROM profile_facts WHERE key=? AND superseded_at IS NULL", (key,))
+    rows = _cached_rows(conn)
+    if rows is not None:
+        row = next((r for r in rows if r["key"] == key), None)
+    else:
+        row = conn.one("SELECT value, status FROM profile_facts WHERE key=? AND superseded_at IS NULL", (key,))
     if not row or (confirmed_only and row["status"] not in ("confirmed", "preference")):
         return None
     return unj(row["value"])
 
 
 def facts(conn: Conn, prefix: str = "") -> list[dict]:
-    rows = conn.q("SELECT * FROM profile_facts WHERE superseded_at IS NULL AND key LIKE ? ORDER BY key", (prefix + "%",))
+    cached = _cached_rows(conn)
+    if cached is not None:
+        rows = [dict(r) for r in cached if r["key"].startswith(prefix)]
+    else:
+        rows = conn.q("SELECT * FROM profile_facts WHERE superseded_at IS NULL AND key LIKE ? ORDER BY key", (prefix + "%",))
     for r in rows:
         r["value"] = unj(r["value"])
     return rows

@@ -48,6 +48,7 @@ class Conn:
         self.url = url
         self.is_pg = url.startswith(("postgres://", "postgresql://"))
         self._depth = 0
+        self.cache: dict | None = None  # read cache for bulk jobs (see pipeline.evaluate_pending); None means always read the database
         if self.is_pg:
             import psycopg
             from psycopg.rows import dict_row

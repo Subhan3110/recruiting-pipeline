@@ -37,6 +37,9 @@ DEFAULT_POLICY = {
 
 
 def current(conn: Conn) -> tuple[int, dict]:
+    if conn.cache is not None and "policy" in conn.cache:
+        v, cfg = conn.cache["policy"]
+        return v, copy.deepcopy(cfg)
     row = conn.one("SELECT version, config FROM policy_versions ORDER BY version DESC LIMIT 1")
     if not row:
         return save(conn, copy.deepcopy(DEFAULT_POLICY), "initial default policy", actor="system")

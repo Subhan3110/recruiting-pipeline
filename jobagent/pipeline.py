@@ -52,8 +52,43 @@ def evaluate_pending(conn: Conn, limit: int = 5000) -> int:
     rows = conn.q("SELECT v.id FROM vacancies v LEFT JOIN evaluations ev ON ev.vacancy_id=v.id AND ev.is_current=1 "
                   "WHERE v.status='open' AND (ev.id IS NULL OR ev.policy_version<>? OR ev.created_at < ? OR ev.created_at < ?) LIMIT ?",
                   (pv, changed, emp_changed, limit))
-    for r in rows:
-        matching.evaluate(conn, r["id"])
+    if not rows:
+        return 0
+    from .db import unj
+    ids = [r["id"] for r in rows]
+    # Load everything the evaluation reads in a handful of queries, then write all results in one transaction.
+    # Against a remote database this turns ~15 round trips per vacancy into a few per batch.
+    vac, raw = {}, {}
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        marks = ",".join("?" * len(chunk))
+        for v in conn.q("SELECT v.*, e.name AS employer_name, e.excluded AS employer_excluded, e.identity_uncertain AS employer_uncertain "
+                        f"FROM vacancies v JOIN employers e ON e.id=v.employer_id WHERE v.id IN ({marks})", chunk):
+            v["locations"] = unj(v["locations"], [])
+            v["sources"] = []
+            vac[v["id"]] = v
+        for srow in conn.q(f"SELECT vacancy_id, source, source_id, url, raw FROM vacancy_sources WHERE vacancy_id IN ({marks}) ORDER BY first_seen", chunk):
+            vac[srow["vacancy_id"]]["sources"].append({k: srow[k] for k in ("source", "source_id", "url")})
+            raw.setdefault(srow["vacancy_id"], srow["raw"])
+    conn.cache = {"policy": policy_mod.current(conn), "vacancies": vac, "raw": raw, "writes": []}
+    try:
+        for vid in ids:
+            matching.evaluate(conn, vid)
+        writes = conn.cache["writes"]
+    finally:
+        conn.cache = None
+    with conn.tx(lock="evaluations"):
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            conn.q(f"UPDATE evaluations SET is_current=0 WHERE is_current=1 AND vacancy_id IN ({','.join('?' * len(chunk))})", chunk)
+        conn.many("INSERT INTO evaluations (id, vacancy_id, created_at, policy_version, score, decision, geo, rationale, detail) VALUES (?,?,?,?,?,?,?,?,?)",
+                  [w[0] for w in writes])
+        conn.many("UPDATE vacancies SET locations=? WHERE id=?", [w[1] for w in writes])
+        if any(w[2] for w in writes):
+            from . import profile
+            profile.open_task(conn, "question", "Work authorisation is not confirmed for some countries",
+                              "Roles are held until you record, per country, whether you may work there and whether you need sponsorship.",
+                              dedup_key="q:work_auth")
     return len(rows)
 
 
