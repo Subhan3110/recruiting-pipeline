@@ -161,6 +161,7 @@ def tick(conn: Conn, worker: str, discovery_interval_hours: float = 6) -> dict:
     if s["preparation_enabled"]:
         out["prepared"] = sum(prepare_pending(conn, a) for a in adapters.values())
     out["queued"] = len(apps.queue_eligible(conn))
+    out["tasks_closed"] = apps.prune_tasks(conn)
     out["submissions"] = [x for a in adapters.values() for x in submit_pending(conn, a, worker)]
     provider = get_provider(conn)
     if provider:

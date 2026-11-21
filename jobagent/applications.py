@@ -240,3 +240,29 @@ def import_application(conn: Conn, rec: dict, actor: str = "import") -> str:
         conn.event("application.imported", "application", aid, {"company": rec["company"], "status": rec.get("status")}, actor=actor,
                    provenance=rec.get("source", "manual entry"))
         return aid
+
+
+def prune_tasks(conn: Conn) -> int:
+    """Close user tasks that no longer apply: questions since answered, document or blocker notes for applications that moved on."""
+    still_missing, problems = set(), []
+    for r in conn.q("SELECT id, state_reason FROM applications WHERE origin='agent' AND state='needs_input'"):
+        ver = version(conn, r["id"])
+        if ver:
+            still_missing |= {m["key"] for m in ver["answers"].get("missing", [])}
+        problems.append(r["state_reason"] or "")
+    closed = 0
+    for t in conn.q("SELECT id, kind, entity_type, entity_id, dedup_key, title FROM user_tasks WHERE status='open'"):
+        done = False
+        if t["entity_type"] == "answer" and t["entity_id"] not in still_missing:
+            done = True
+        elif (t["dedup_key"] or "").startswith("doc:") and not any("document" in p for p in problems):
+            done = True
+        elif (t["dedup_key"] or "").startswith("blk:") and t["entity_id"]:
+            done = conn.val("SELECT state FROM applications WHERE id=?", (t["entity_id"],)) != "needs_input"
+        if done:
+            conn.q("UPDATE user_tasks SET status='done', resolution='no longer needed: answered or the application moved on', resolved_at=? WHERE id=?",
+                   (now(), t["id"]))
+            closed += 1
+    if closed:
+        conn.event("tasks.pruned", data={"closed": closed})
+    return closed

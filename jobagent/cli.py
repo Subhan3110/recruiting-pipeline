@@ -152,7 +152,8 @@ def cmd_reprepare(a):
         except Exception as e:  # noqa: BLE001
             st = "error:" + type(e).__name__
         states[st] = states.get(st, 0) + 1
-    print({"re-prepared": len(rows), "states": states, "queued_now": len(apps.queue_eligible(conn))})
+    print({"re-prepared": len(rows), "states": states, "queued_now": len(apps.queue_eligible(conn)),
+           "tasks_closed": apps.prune_tasks(conn), "tasks_open": conn.val("SELECT COUNT(*) FROM user_tasks WHERE status='open'")})
 
 
 def cmd_serve(a):

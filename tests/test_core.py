@@ -514,3 +514,17 @@ def test_bulk_re_evaluation_matches_one_by_one(conn):
     assert pipeline.evaluate_pending(conn) == 0                       # nothing changed: nothing re-evaluated
     profile.set_fact(conn, "contact/phone", "+47 1", "confirmed", "test")
     assert pipeline.evaluate_pending(conn) == 5 and conn.val("SELECT COUNT(*) FROM evaluations WHERE is_current=1") == 5
+
+
+def test_answered_questions_close_their_tasks(conn):
+    seed_profile(conn)
+    vid = add_vacancy(conn)
+    matching.evaluate(conn, vid)
+    app = apps.ensure(conn, vid)
+    q = FakeAdapter().form("x/1")["questions"] + [{"label": "Have you prepared financial statements for a bank?", "description": "", "required": True,
+                                                   "fields": [{"name": "question_9", "type": "multi_value_single_select", "options": [{"label": "Yes", "value": 1}, {"label": "No", "value": 0}]}]}]
+    assert apps.prepare(conn, app["id"], FakeAdapter(questions=q))["state"] == "needs_input"
+    assert apps.prune_tasks(conn) == 0 and conn.val("SELECT COUNT(*) FROM user_tasks WHERE status='open' AND entity_type='answer'") == 1
+    answers.set_answer(conn, "financial_statements", "No", source="user")
+    assert apps.prepare(conn, app["id"], FakeAdapter(questions=q))["state"] == "prepared"
+    assert apps.prune_tasks(conn) == 1 and conn.val("SELECT COUNT(*) FROM user_tasks WHERE status='open' AND entity_type='answer'") == 0
