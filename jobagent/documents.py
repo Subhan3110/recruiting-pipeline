@@ -44,12 +44,21 @@ def cv_data(conn: Conn, strict: bool = True) -> dict:
     return {
         "name": (one("identity/name") or {}).get("full"), "email": one("contact/application_email") or one("contact/email"),
         "phone": one("contact/phone"), "location": one("contact/location"), "linkedin": one("links/linkedin"),
-        "education": [f["value"] for f in _facts(conn, "education/", strict)],
+        "education": profile.education_entries(conn, strict),
         "employment": sorted((f["value"] for f in _facts(conn, "employment/", strict)), key=lambda e: str(e.get("start", "")), reverse=True),
         "achievements": [f["value"] for f in _facts(conn, "achievements/", strict)],
         "skills": [f["value"] for f in _facts(conn, "skills/", strict)],
         "languages": [f["value"] for f in _facts(conn, "languages/", strict)],
     }
+
+
+def _month(v) -> str:
+    """'2026-09' -> 'Sep 2026'; anything else is shown as given."""
+    import datetime as dt
+    try:
+        return dt.datetime.strptime(str(v), "%Y-%m").strftime("%b %Y")
+    except ValueError:
+        return str(v)
 
 
 def render_cv(data: dict) -> bytes:
@@ -75,20 +84,20 @@ def render_cv(data: dict) -> bytes:
         story.append(Paragraph("Education", h2))
         for ed in data["education"]:
             head = f"<b>{e(ed.get('institution', ''))}</b>, {e(ed.get('degree', ''))}"
-            when = " to ".join(str(x) for x in (ed.get("start"), ed.get("graduation") or ed.get("end")) if x)
+            when = " to ".join(_month(x) for x in (ed.get("start"), ed.get("graduation") or ed.get("end")) if x)
             story.append(Paragraph(head + (f" ({e(when)})" if when else ""), body))
             for line in ([f"GPA {ed['gpa_text']}"] if ed.get("gpa_text") else []) + list(ed.get("highlights", [])):
                 story.append(Paragraph(e(line), bullet, bulletText="•"))
     if data["employment"]:
         story.append(Paragraph("Experience", h2))
         for job in data["employment"]:
-            when = f"{job.get('start', '')} to {job.get('end') or 'present'}"
+            when = f"{_month(job.get('start', ''))} to {_month(job['end']) if job.get('end') else 'present'}"
             story.append(Paragraph(f"<b>{e(job.get('employer', ''))}</b>, {e(job.get('title', ''))} ({e(when)})", body))
             for line in job.get("bullets", []):
                 story.append(Paragraph(e(line), bullet, bulletText="•"))
             story.append(Spacer(1, 3))
     if data["achievements"]:
-        story.append(Paragraph("Achievements", h2))
+        story.append(Paragraph("Projects and leadership", h2))
         for a in data["achievements"]:
             story.append(Paragraph(e(a.get("text", "") if isinstance(a, dict) else str(a)), bullet, bulletText="•"))
     if data["skills"]:
@@ -106,17 +115,19 @@ def compose_cover_letter(conn: Conn, vacancy: dict, categories: list[str], stric
     """Deterministic letter assembled only from stored facts and the candidate's own approved story wording."""
     one = lambda k: profile.get_fact(conn, k, confirmed_only=strict)  # noqa: E731
     name = (one("identity/name") or {}).get("full")
-    edu = next(iter(_facts(conn, "education/", strict)), None)
-    if not name or not edu:
+    ed = profile.current_education(conn, strict)
+    if not name or not ed:
         return None
-    ed = edu["value"]
+    from datetime import date
+    in_progress = str(ed.get("graduation") or "0") > date.today().strftime("%Y-%m")
     stories = [f["value"] for f in _facts(conn, "stories/", strict)]
     cat_words = set(re.findall(r"[a-z&]+", " ".join(categories).lower()))
     ranked = sorted(stories, key=lambda s: -len(cat_words & set(t.lower() for t in s.get("tags", []))))
     chosen = [s for s in ranked if cat_words & set(t.lower() for t in s.get("tags", []))][:2] or ranked[:1]
     paras = [f"I am applying for the {vacancy['title']} position at {vacancy['employer_name']}.",
-             f"I study {ed.get('degree', '')} at {ed.get('institution', '')}"
-             + (f" and expect to graduate in {ed['graduation']}" if ed.get("graduation") else "") + "."
+             (f"I study {ed.get('degree', '')} at {ed.get('institution', '')}" if in_progress
+              else f"I hold a {ed.get('degree', '')} from {ed.get('institution', '')}")
+             + (f" and expect to graduate in {ed['graduation']}" if in_progress and ed.get("graduation") else "") + "."
              + (f" My current GPA is {ed['gpa_text']}." if ed.get("gpa_text") else "")]
     paras += [s["text"] for s in chosen]
     avail = one("preferences/availability")

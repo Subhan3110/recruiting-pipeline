@@ -129,18 +129,22 @@ def _pick_option(options: list[dict], text: str) -> dict | None:
     return hits[0] if len(hits) == 1 else None
 
 
-def _profile_value(conn: Conn, key: str, country: str | None, employer_id: str, strict: bool):
+COMPLETED = re.compile(r"complet|obtain|earned|attained|highest|achieved|graduated from", re.I)
+
+
+def _profile_value(conn: Conn, key: str, country: str | None, employer_id: str, strict: bool, label: str = ""):
     """Answers derived from confirmed profile facts. Returns (text, source) or (None, None)."""
     get = lambda k: profile.get_fact(conn, k, confirmed_only=strict)  # noqa: E731
     name = get("identity/name") or {}
-    edu = next((f["value"] for f in profile.facts(conn, "education/") if not strict or f["status"] == "confirmed"), {}) or {}
+    edu = profile.current_education(conn, strict, completed=bool(COMPLETED.search(label))) or {}
+    gpa = next((e["gpa_text"] for e in profile.education_entries(conn, strict) if e.get("gpa_text")), None)
     simple = {
         "first_name": (name.get("first"), "identity/name"), "last_name": (name.get("last"), "identity/name"),
         "email": (get("contact/application_email") or get("contact/email"), "contact/email"),
         "phone": (get("contact/phone"), "contact/phone"), "linkedin": (get("links/linkedin"), "links/linkedin"),
         "website": (get("links/website"), "links/website"),
         "university": (edu.get("institution"), "education"), "field_of_study": (edu.get("field"), "education"),
-        "degree_level": (edu.get("level"), "education"), "gpa": (edu.get("gpa_text"), "education"),
+        "degree_level": (edu.get("level"), "education"), "gpa": (gpa, "education"),
         "graduation_year": (str(edu["graduation"])[:4] if edu.get("graduation") else None, "education"),
         "graduation_month": (edu.get("graduation_month"), "education"),
         "graduation_date": (edu.get("graduation"), "education"),
@@ -215,7 +219,7 @@ def resolve_form(conn: Conn, form: dict, vacancy: dict, geo_eval: dict, strict: 
             else:
                 out["missing"].append(entry | {"options": [o["label"] for o in options], "why": "no eligible location among the options"})
             continue
-        text, source = _profile_value(conn, key, country, employer_id, strict)
+        text, source = _profile_value(conn, key, country, employer_id, strict, q["label"])
         if text is None:
             lib = lookup(conn, key, employer_id, country or (countries[0] if len(countries) == 1 else None), allow_proposed=not strict)
             if lib:

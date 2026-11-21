@@ -137,16 +137,21 @@ def classify_location(raw: str, policy: dict) -> dict:
     core = re.sub(r"\s+", " ", core)
     toks = [t.strip() for t in core.split(",") if t.strip()]
     country = None
-    for t in reversed(toks):
-        country = country_of(t)
-        if country:
-            break
-    if not country and toks and (norm(toks[-1]) in US_STATE_CODES or norm(toks[-1]) in US_STATES):
-        country = "US"
-    if not country and toks and norm(toks[-1]) in CA_PROVINCES:
-        country = "CA"
+    last = norm(toks[-1]) if toks else ""
+    if len(toks) > 1 and last not in _COUNTRY_BY_NAME:  # "Manchester, NH": the qualifier decides, not the city name
+        if last in US_STATE_CODES or last in US_STATES:
+            country = "US"
+        elif last in CA_PROVINCES:
+            country = "CA"
+    if not country:
+        for t in reversed(toks):
+            country = country_of(t)
+            if country:
+                break
     out = {"raw": raw, "country": country, "area": None, "remote": remote}
     area = _area_hit(core, areas)
+    if area and country and area.get("country") and country != area["country"]:
+        area = None  # explicit different country, e.g. "Manchester, NH"
     if area:
         return out | {"kind": "excluded", "area": area["name"], "country": area.get("country") or country,
                       "reason": f"inside {area['name']}"}

@@ -1,13 +1,13 @@
 # Handoff
 
-Last updated: 2026-11-12 (Claude Code, branch `claude/job-agent`, not merged to `main`, no pull request).
+Last updated: 2026-11-21 (Claude Code, branch `claude/job-agent`, not merged to `main`, no pull request).
 
 ## Verified state
 | Area | State | Evidence |
 |---|---|---|
 | Test suite | 74 tests pass on SQLite and on PostgreSQL 16 (local) | `python -m pytest -q`, `JOBAGENT_TEST_PG=...` |
 | Greenhouse discovery | Live: 34 boards, 4,335 vacancies stored and evaluated | `jobs` rows all `done`; `python -m jobagent status` |
-| Matching and geography | Live data: 405 held, 3,930 rejected, 0 automatic (work authorisation is unconfirmed, so everything relevant holds) | `evaluations` |
+| Matching and geography | Live data after the CV and policy v2: 474 held, 3,861 rejected, 0 automatic (work authorisation unconfirmed) | `evaluations` |
 | Form filling on a real Greenhouse form | Live dry run with the synthetic test profile: 10 fields incl. dropdowns, CV and letter upload, location. Submit not clicked | attempt outcome `dry_run`, `submit_clicked_at` NULL |
 | Submit, confirmation, security code, ambiguous outcome, recovery | Real Chromium against the local fixture form only | `tests/test_submission.py` |
 | Prior applications | 147 imported from the tracker artifact (63 active, 84 closed); 111 employers hold a used allowance | `applications.origin='imported'`, `employer_slots` |
@@ -24,10 +24,17 @@ Last updated: 2026-11-12 (Claude Code, branch `claude/job-agent`, not merged to 
 - No always-on worker deployment. `python -m jobagent worker` works, but unattended hosting is not set up or verified.
 - NAV Arbeidsplassen, Lever and Ashby adapters; model-assisted ranking and letter drafting; the tracker write-back (agent submissions into `pipeline.html` data).
 - The environment setup script was saved but is unproven until a fresh session starts on the `recruiting-pipeline` environment.
-- Candidate profile: 24 facts are **unconfirmed** (seeded from undated skill files, not from a CV). Open questions are in `user_tasks`.
+- Candidate profile: loaded from the owner's CV (2026-11-21), 37 facts, mostly confirmed. Still unconfirmed: current base (London inferred from the MSc),
+  POWER job, Econa, Excel/VBA/financial-modelling skills, UK Graduate visa (future). Cover-letter paragraphs (`stories/*`) are **proposed**, so no cover letter is generated until approved.
+- Work authorisation is unknown for every country, so all relevant vacancies are held (474 held, 0 automatic).
+
+## Policy change 2026-11-21 (policy v2)
+Owner: applications must be outside Norway and the UK. Implemented as two whole-country excluded areas next to the Oslo and London areas. Such roles stay discoverable and rankable
+but need individual approval (assumption: the earlier approve-first rule still applies, rather than never applying). The owner expects a UK Graduate visa after the MSc (UK only, irrelevant to the automatic area).
+Explicit state or country qualifiers now beat place names ("Manchester, NH" is not UK).
 
 ## Blockers that need the owner
-1. Current CV, and confirmation or correction of the seeded facts.
+1. Where you live now (London?), and what your current visa allows while studying.
 2. Citizenship and work authorisation per country, and whether to apply where sponsorship is needed.
 3. Standing answers: availability, notice period, salary expectations, relocation, LinkedIn URL, demographic-question preference.
 4. Application mailbox choice and read-only access.

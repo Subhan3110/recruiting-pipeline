@@ -204,7 +204,7 @@ def test_documents_render_from_confirmed_facts_only(conn):
     from pypdf import PdfReader
     import io
     text = " ".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
-    assert "Test Candidate" in text and "Acme Audit AS" in text and "Madeup" not in text
+    assert "Test Candidate" in text and "Acme Audit AS" in text and "Madeup" not in text and "Sep 2025 to present" in text
     letter = documents.load(conn, docs["cover_letter"])[0]["meta"]["text"]
     assert "Fixture Bank" in letter and "—" not in letter and "passionate" not in letter.lower()
     assert b"Test Candidate" not in conn.one("SELECT content_enc FROM documents WHERE id=?", (docs["resume"],))["content_enc"].encode()
@@ -268,3 +268,34 @@ def test_lookalike_employer_with_history_blocks_automatic_application(conn):
     employers.merge(conn, old["id"], vacancies.get(conn, vid)["employer_id"])
     assert matching.evaluate(conn, vid)["decision"] == "auto"      # relevant, but ...
     assert conn.val("SELECT COUNT(*) FROM employer_slots WHERE employer_id=?", (old["id"],)) == 1  # ... the allowance is already used
+
+
+def test_country_wide_exclusion_and_explicit_country_beats_place_name():
+    from jobagent import geo as g
+    cfg = __import__("copy").deepcopy(P)
+    cfg["excluded_areas"] += [
+        {"name": "Norway", "country": "NO", "places": ["norway", "norge"] + g.CITIES["NO"], "exceptions": []},
+        {"name": "United Kingdom", "country": "GB", "places": ["united kingdom", "uk", "england", "scotland", "wales"] + g.CITIES["GB"], "exceptions": []}]
+    d = lambda raw: g.evaluate(raw, None, "", cfg, HOME)["decision"]  # noqa: E731
+    assert [d("Bergen, Norway"), d("Norway"), d("Remote (Norway)"), d("Manchester, UK"), d("Edinburgh"), d("Remote - UK")] == ["approval"] * 6
+    assert [d("Manchester, NH"), d("Cambridge, MA"), d("Ukraine"), d("Dubai"), d("Stockholm"), d("Remote - US")] == ["auto"] * 6
+    assert d("Zurich; Bergen, Norway") == "auto_if_selectable"
+
+
+def test_current_and_completed_degrees_are_told_apart(conn):
+    seed_profile(conn)
+    profile.set_fact(conn, "education/ba", {"institution": "First University", "degree": "BSc Finance", "level": "Bachelor's", "field": "Finance",
+                                            "start": "2021-08", "graduation": "2024-05", "gpa_text": "4.5/5"}, "confirmed", "cv")
+    profile.set_fact(conn, "education/uni", {"institution": "Second College", "degree": "MSc Finance", "level": "Master's", "field": "Finance",
+                                             "start": "2099-09", "graduation": "2100-09"}, "confirmed", "cv")
+    form = {"questions": [
+        {"label": "What degree are you currently pursuing?", "required": True, "description": "", "fields": [{"name": "question_1", "type": "input_text", "options": []}]},
+        {"label": "Highest level of education completed", "required": True, "description": "", "fields": [{"name": "question_2", "type": "input_text", "options": []}]},
+        {"label": "What is your GPA?", "required": True, "description": "", "fields": [{"name": "question_3", "type": "input_text", "options": []}]},
+        {"label": "What university do you attend?", "required": True, "description": "", "fields": [{"name": "question_4", "type": "input_text", "options": []}]}]}
+    vac = {"employer_id": "emp_x"}
+    got = {a["field"]: a["value"] for a in answers.resolve_form(conn, form, vac, {"countries": ["NL"]})["answers"]}
+    assert got == {"question_1": "Master's", "question_2": "Bachelor's", "question_3": "4.5/5", "question_4": "Second College"}
+    v = {"id": "v", "title": "Analyst", "employer_name": "X"}
+    text = documents.compose_cover_letter(conn, v, [])
+    assert "I study MSc Finance at Second College" in text and "4.5" not in text

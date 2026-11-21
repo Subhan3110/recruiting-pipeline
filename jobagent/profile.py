@@ -126,3 +126,21 @@ def import_profile(conn: Conn, data: dict, actor: str = "import") -> dict:
                                a.get("status", "proposed"), a["source"])
         n["answers"] += 1
     return n
+
+
+# -- education helpers: a candidate can have a finished degree and a current one --------------
+def education_entries(conn: Conn, strict: bool = True) -> list[dict]:
+    """Education entries, latest graduation first."""
+    rows = [f for f in facts(conn, "education/") if not strict or f["status"] in ("confirmed", "preference")]
+    return sorted((f["value"] for f in rows), key=lambda e: str(e.get("graduation") or e.get("end") or "9999"), reverse=True)
+
+
+def current_education(conn: Conn, strict: bool = True, completed: bool = False) -> dict | None:
+    """The degree in progress (or latest). With completed=True, only degrees whose graduation date has passed."""
+    from datetime import date
+
+    entries = education_entries(conn, strict)
+    if completed:
+        today = date.today().strftime("%Y-%m")
+        entries = [e for e in entries if str(e.get("graduation") or e.get("end") or "9999") <= today]
+    return entries[0] if entries else None
