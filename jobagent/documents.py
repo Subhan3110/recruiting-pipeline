@@ -127,13 +127,84 @@ def compose_cover_letter(conn: Conn, vacancy: dict, categories: list[str], stric
     paras = [f"I am applying for the {vacancy['title']} position at {vacancy['employer_name']}.",
              (f"I study {ed.get('degree', '')} at {ed.get('institution', '')}" if in_progress
               else f"I hold a {ed.get('degree', '')} from {ed.get('institution', '')}")
-             + (f" and expect to graduate in {ed['graduation']}" if in_progress and ed.get("graduation") else "") + "."
+             + (f" and expect to graduate in {_month_long(ed['graduation'])}" if in_progress and ed.get("graduation") else "") + "."
              + (f" My current GPA is {ed['gpa_text']}." if ed.get("gpa_text") else "")]
+    done = profile.current_education(conn, strict, completed=True)
+    if done and done is not ed and done != ed:
+        paras[-1] += f" I hold a {done.get('degree', '')} from {done.get('institution', '')}" + \
+            (f" with a GPA of {done['gpa_text']}" if done.get("gpa_text") else "") + "."
     paras += [s["text"] for s in chosen]
     avail = one("preferences/availability")
     paras.append((f"{avail} " if isinstance(avail, str) and avail else "") + "I would welcome the chance to discuss the role.")
     text = "\n\n".join(paras) + f"\n\nKind regards,\n{name}"
     return re.sub(r"\s+[—–]\s+", ", ", text).replace("—", ",")  # writing preference: no dashes
+
+
+def _month_long(v) -> str:
+    import datetime as dt
+    try:
+        return dt.datetime.strptime(str(v), "%Y-%m").strftime("%B %Y")
+    except ValueError:
+        return str(v)
+
+
+# -- writer agent: letters written by a Claude session, checked here before use ------------------------------
+BANNED = re.compile(r"passionat|thrilled|dream (job|company)|esteemed|synerg|\bleverag", re.I)
+
+
+def letter_facts_text(conn: Conn) -> str:
+    """All confirmed fact text the writer may draw on, used to check that every number in a letter is backed by a fact."""
+    import json as _json
+    return _json.dumps([f["value"] for f in profile.facts(conn) if f["status"] in ("confirmed", "preference")], ensure_ascii=False)
+
+
+def check_letter(conn: Conn, text: str, vacancy: dict) -> list[str]:
+    """Rules a written letter must pass before it can be attached. Returns problems (empty = accepted)."""
+    problems = []
+    if re.search(r"[\u2014\u2013]", text):
+        problems.append("contains an em or en dash")
+    words = len(re.findall(r"\b\w+\b", text))
+    if not 120 <= words <= 380:
+        problems.append(f"length {words} words (expected 120 to 380)")
+    if vacancy["employer_name"].split()[0].lower() not in text.lower():
+        problems.append("does not name the employer")
+    if BANNED.search(text):
+        problems.append(f"generic phrasing: {BANNED.search(text).group(0)!r}")
+    facts = letter_facts_text(conn)
+    vac_text = (vacancy.get("title", "") + " " + (vacancy.get("description") or "")).lower()
+    for num in set(re.findall(r"\d[\d,.]*%?", text)):
+        n = num.rstrip(".,")
+        if n and n not in facts and n.lower() not in vac_text:
+            problems.append(f"number {n!r} is not in your confirmed facts or the vacancy")
+    name = (profile.get_fact(conn, "identity/name", confirmed_only=True) or {}).get("full")
+    if name and name not in text:
+        problems.append("is not signed with your name")
+    return problems
+
+
+def add_written_letter(conn: Conn, vacancy_id: str, text: str, author: str = "writer-agent") -> dict:
+    from . import vacancies as vac_mod
+
+    v = vac_mod.get(conn, vacancy_id)
+    if not v:
+        return {"ok": False, "problems": ["unknown vacancy"]}
+    text = text.strip()
+    problems = check_letter(conn, text, v)
+    if problems:
+        conn.event("letter.rejected", "vacancy", vacancy_id, {"problems": problems}, actor=author)
+        return {"ok": False, "problems": problems}
+    conn.q("INSERT INTO answers (id, question_key, scope_type, scope_value, answer, status, source, confirmed_at, created_at) "
+           "VALUES (?,?,?,?,?,?,?,?,?)", (new_id("ans"), "letter", "employer", vacancy_id, text, "confirmed", author, now(), now()))
+    conn.q("UPDATE answers SET superseded_at=? WHERE question_key='letter' AND scope_value=? AND superseded_at IS NULL AND answer<>?",
+           (now(), vacancy_id, text))
+    conn.event("letter.accepted", "vacancy", vacancy_id, {"words": len(text.split())}, actor=author)
+    return {"ok": True, "problems": []}
+
+
+def written_letter(conn: Conn, vacancy_id: str) -> str | None:
+    row = conn.one("SELECT answer FROM answers WHERE question_key='letter' AND scope_type='employer' AND scope_value=? AND superseded_at IS NULL "
+                   "ORDER BY created_at DESC LIMIT 1", (vacancy_id,))
+    return row["answer"] if row else None
 
 
 def render_letter(text: str, name: str) -> bytes:
@@ -189,7 +260,7 @@ def build_for(conn: Conn, vacancy: dict, categories: list[str], needs: dict, str
                                    + [x.get("employer", "") for x in data["employment"]])
             docs["resume"] = store(conn, "resume", f"{slug}_CV.pdf", "application/pdf", pdf, {"source_hash": src, "strict": strict})
     if needs.get("cover_letter"):
-        text = compose_cover_letter(conn, vacancy, categories, strict)
+        text = written_letter(conn, vacancy["id"]) or compose_cover_letter(conn, vacancy, categories, strict)
         if text:
             pdf = render_letter(text, data["name"])
             problems += verify_pdf(pdf, [vacancy["employer_name"], data["name"]], max_pages=1)

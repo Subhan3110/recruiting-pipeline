@@ -71,6 +71,11 @@ Owner chose the existing Gmail connector instead of a mailbox password. Added th
 (migration 002) and `docs/MAIL_RELAY.md`. Verified from the cloud session that the connector returns real Greenhouse acknowledgement mails and
 that the acknowledgement wording matches the parser. Not yet run on the Mac against Supabase.
 
+## Agents (2026-11-21)
+The worker now runs as three roles (finder, writer, applier), see `docs/AGENTS_RUNTIME.md`. Cover letters are written by a Claude session
+(`letters-needed`, `letter-add`), fact-checked, rendered to PDF by the writer role and attached by the applier. Verified on a sandbox copy: one letter
+written, accepted by the checks and rendered (1 page); a fabricated percentage and an em dash are rejected in tests.
+
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.
 2. Compliance answers (PEP, relatives, referral, military, outstanding offers, AI-tool consent) and years of experience.

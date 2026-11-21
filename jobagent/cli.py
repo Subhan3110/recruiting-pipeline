@@ -58,8 +58,9 @@ def cmd_doctor(a):
     line("profile", conn.val("SELECT COUNT(*) FROM profile_facts WHERE superseded_at IS NULL") > 0,
          f"{conn.val('SELECT COUNT(*) FROM profile_facts WHERE superseded_at IS NULL')} current facts, "
          f"{conn.val('SELECT COUNT(*) FROM documents')} documents")
-    hb = db.get_setting(conn, "worker_heartbeat")
-    line("worker heartbeat", True, hb["at"] if hb else "never (no worker has run)")
+    for role in pipeline.ROLES:
+        hb = db.get_setting(conn, f"heartbeat_{role}")
+        line(f"{role} agent", True, f"last ran {hb['at']}" if hb else "has not run yet")
     from .mail import get_provider
     prov = get_provider(conn)
     if prov:
@@ -110,18 +111,19 @@ def cmd_discover(a):
 
 
 def cmd_run_once(a):
+    """One pass of one agent (--role finder|writer|applier) or all three."""
     conn = _conn()
-    print(json.dumps(pipeline.tick(conn, submission.worker_id()), indent=1, default=str))
+    print(json.dumps(pipeline.tick(conn, submission.worker_id() + ":" + a.role, role=a.role), indent=1, default=str))
 
 
 def cmd_worker(a):
     redact.setup()
     conn = _conn()
-    wid = submission.worker_id()
-    redact.log().info("worker started", extra={"data": {"worker": wid}})
+    wid = submission.worker_id() + ":" + a.role
+    redact.log().info("worker started", extra={"data": {"worker": wid, "role": a.role}})
     while True:
         try:
-            out = pipeline.tick(conn, wid)
+            out = pipeline.tick(conn, wid, role=a.role)
             redact.log().info("tick", extra={"data": out})
         except Exception:  # noqa: BLE001
             redact.log().exception("tick failed")
@@ -169,6 +171,18 @@ def cmd_mail_relay_needs(a):
     print(json.dumps(relay.needs(_conn()), indent=1, default=str))
 
 
+def cmd_letters_needed(a):
+    """Writer agent work list: vacancies that need a cover letter, with the facts and rules to write it."""
+    print(json.dumps(pipeline.letters_needed(_conn(), limit=a.limit), indent=1, ensure_ascii=False, default=str))
+
+
+def cmd_letter_add(a):
+    """Store a written cover letter for a vacancy (text from a file or stdin). It is checked before it can be used."""
+    from . import documents
+    text = (open(a.file, encoding="utf-8") if a.file != "-" else sys.stdin).read()
+    print(json.dumps(documents.add_written_letter(_conn(), a.vacancy_id, text)))
+
+
 def cmd_serve(a):
     import uvicorn
     from .web import create_app
@@ -207,11 +221,14 @@ def main(argv=None):
     add("secret-set", cmd_secret_set, ("ref", {}), ("--scope", {"required": True, "choices": sorted(secretstore.SCOPES)}))
     add("import-applications", cmd_import_applications, ("file", {}), ("--source", {"default": "manual import"}))
     add("discover", cmd_discover, ("--source", {"default": "greenhouse", "choices": sorted(registry())}), ("--boards", {"default": ""}))
-    add("run-once", cmd_run_once)
+    roles = {"default": "all", "choices": ["all", "finder", "writer", "applier"]}
+    add("run-once", cmd_run_once, ("--role", roles))
     add("reprepare", cmd_reprepare)
     add("mail-relay-add", cmd_mail_relay_add, ("file", {"help": "JSON file or - for stdin"}), ("--provider", {"default": "gmail_connector"}))
     add("mail-relay-needs", cmd_mail_relay_needs)
-    add("worker", cmd_worker, ("--interval", {"type": int, "default": 300}))
+    add("letters-needed", cmd_letters_needed, ("--limit", {"type": int, "default": 10}))
+    add("letter-add", cmd_letter_add, ("vacancy_id", {}), ("file", {"help": "text file or - for stdin"}))
+    add("worker", cmd_worker, ("--interval", {"type": int, "default": 300}), ("--role", roles))
     add("serve", cmd_serve, ("--host", {"default": "127.0.0.1"}), ("--port", {"type": int, "default": 8787}))
     add("backup", cmd_backup, ("path", {}), ("--portable", {"action": "store_true"}))
     add("restore", cmd_restore, ("path", {}))

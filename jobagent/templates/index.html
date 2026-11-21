@@ -10,7 +10,7 @@
 <form method="post" action="/setting" class="stat"><span class="mute small">{{ label }}</span><b class="{{ 'warn' if (key in ['global_pause','dry_run'] and settings[key]) else '' }}">{{ 'On' if settings[key] else 'Off' }}</b>
 <input type="hidden" name="key" value="{{ key }}"><input type="hidden" name="value" value="{{ 'false' if settings[key] else 'true' }}">
 <button class="{{ 'danger' if key=='global_pause' and not settings[key] else '' }}">{{ 'Turn off' if settings[key] else ('Pause all submissions' if key=='global_pause' else 'Turn on') }}</button></form>{% endfor %}
-</div><p class="mute small">Worker last seen: {{ heartbeat or 'never' }}. Applications are sent only when the pause is off, dry run is off and live submission is on.
+</div><p class="mute small">Agents last ran: finder {{ heartbeats.finder or 'never' }}, writer {{ heartbeats.writer or 'never' }}, applier {{ heartbeats.applier or 'never' }}. Applications are sent only when the pause is off, dry run is off and live submission is on.
 Oslo and London applications additionally need your approval of the exact prepared version.</p></div>
 <div class="card"><h2>Pipeline</h2><div class="grid">
 <div class="stat"><span class="mute small">Open vacancies</span><b>{{ counts.vacancies }}</b></div>

@@ -298,7 +298,7 @@ def test_current_and_completed_degrees_are_told_apart(conn):
     assert got == {"question_1": "Master's", "question_2": "Bachelor's", "question_3": "4.5/5", "question_4": "Second College"}
     v = {"id": "v", "title": "Analyst", "employer_name": "X"}
     text = documents.compose_cover_letter(conn, v, [])
-    assert "I study MSc Finance at Second College" in text and "4.5" not in text
+    assert "I study MSc Finance at Second College" in text and "I hold a BSc Finance from First University with a GPA of 4.5/5." in text
 
 
 def test_norwegian_passport_covers_eea_and_switzerland_only(conn):
@@ -528,3 +528,38 @@ def test_answered_questions_close_their_tasks(conn):
     answers.set_answer(conn, "financial_statements", "No", source="user")
     assert apps.prepare(conn, app["id"], FakeAdapter(questions=q))["state"] == "prepared"
     assert apps.prune_tasks(conn) == 1 and conn.val("SELECT COUNT(*) FROM user_tasks WHERE status='open' AND entity_type='answer'") == 0
+
+
+def test_writer_agent_documents_are_the_ones_the_applier_attaches(conn):
+    from jobagent import pipeline
+    seed_profile(conn)
+    vid = add_vacancy(conn)
+    pipeline.evaluate_pending(conn)
+    out = pipeline.write_documents(conn)
+    assert out["written"] == 1 and out["letters"] == 1
+    written = {r["kind"]: r["id"] for r in conn.q("SELECT id, kind FROM documents")}
+    app = apps.ensure(conn, vid)
+    apps.prepare(conn, app["id"], FakeAdapter())
+    attached = apps.version(conn, app["id"])["document_ids"]
+    assert attached == written and conn.val("SELECT COUNT(*) FROM documents") == 2
+
+
+def test_written_letters_are_fact_checked_and_attached(conn):
+    from jobagent import pipeline
+    seed_profile(conn)
+    vid = add_vacancy(conn)
+    pipeline.evaluate_pending(conn)
+    need = pipeline.letters_needed(conn)
+    assert need["vacancies"][0]["vacancy_id"] == vid and "employment/acme" in need["facts"]
+    body = ("I am applying for the Compliance Analyst Intern role at Fixture Bank. At Acme Audit AS I work as an AML Assistant and screen "
+            "transactions against sanctions lists, which is the core of the monitoring and KYC work your team describes. ") * 3
+    bad = documents.add_written_letter(conn, vid, body + "I raised conversion by 47% \u2014 quickly.\n\nKind regards,\nTest Candidate")
+    assert not bad["ok"] and any("dash" in p for p in bad["problems"]) and any("47%" in p for p in bad["problems"])
+    assert not documents.add_written_letter(conn, vid, "Too short. Fixture Bank. Test Candidate")["ok"]
+    good = body + "I can start in June.\n\nKind regards,\nTest Candidate"
+    assert documents.add_written_letter(conn, vid, good) == {"ok": True, "problems": []}
+    assert pipeline.letters_needed(conn)["vacancies"] == []
+    app = apps.ensure(conn, vid)
+    apps.prepare(conn, app["id"], FakeAdapter())
+    meta, _ = documents.load(conn, apps.version(conn, app["id"])["document_ids"]["cover_letter"])
+    assert meta["meta"]["text"] == good.strip()

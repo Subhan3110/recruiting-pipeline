@@ -60,7 +60,8 @@ def create_app() -> FastAPI:
         pv, cfg = policy.current(c)
         ctx = {"tab": tab if tab in TABS else "overview", "tabs": TABS, "msg": msg, "settings": db.all_settings(c), "pv": pv, "cfg": cfg,
                "mode": submission.mode(c) or "paused", "tasks": profile.open_tasks(c), "state_filter": state, "decision_filter": decision,
-               "heartbeat": (db.get_setting(c, "worker_heartbeat") or {}).get("at")}
+               "heartbeat": (db.get_setting(c, "worker_heartbeat") or {}).get("at"),
+               "heartbeats": {r: ((db.get_setting(c, f"heartbeat_{r}") or {}).get("at") or "")[:16].replace("T", " ") for r in ("finder", "writer", "applier")}}
         ctx["counts"] = {
             "vacancies": c.val("SELECT COUNT(*) FROM vacancies WHERE status='open'"),
             "decisions": {r["decision"]: r["n"] for r in c.q("SELECT decision, COUNT(*) AS n FROM evaluations ev JOIN vacancies v ON v.id=ev.vacancy_id "
