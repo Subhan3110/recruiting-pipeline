@@ -37,9 +37,17 @@ Owner: applications must be outside Norway and the UK. Implemented as two whole-
 but need individual approval (assumption: the earlier approve-first rule still applies, rather than never applying). The owner expects a UK Graduate visa after the MSc (UK only, irrelevant to the automatic area).
 Explicit state or country qualifiers now beat place names ("Manchester, NH" is not UK).
 
+## Owner decisions 2026-11-21 (policy v3)
+Norwegian is the only citizenship, no other permits. Apply everywhere including where sponsorship would be needed, but not where the posting rules sponsorship out (`eligibility.apply_when_sponsorship_needed=true`;
+forms are answered truthfully: not authorised, sponsorship needed). Available from June 2027, willing to relocate, salary "in line with industry standards".
+Standing answers stored as confirmed: start_date, salary_expectation, relocation, plus three chosen by Claude and disclosed to the owner: notice_period "None" (derived from the CV), age_18 "Yes", consent:privacy "Yes", heard_from "Company website".
+Live state: 206 vacancies at 25 employers are automatic-eligible; 42 applications prepared against live forms stop at `needs_input`. The top gaps are `contact/location` (still unconfirmed, 17 forms),
+politically-exposed-person / relative / referral questions, military service, years of experience, AI-tool consents and outstanding-offers. No form was submitted or dry-run with real data
+(attaching a CV on a Greenhouse form uploads it to Greenhouse storage even without submitting, so live fills use the synthetic profile only).
+
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.
-2. Confirm Norwegian is the only citizenship, and whether to apply where sponsorship is needed (non-EEA).
+2. Compliance answers (PEP, relatives, referral, military, outstanding offers, AI-tool consent) and years of experience.
 3. Standing answers: availability, notice period, salary expectations, relocation, LinkedIn URL, demographic-question preference.
 4. Application mailbox choice and read-only access.
 5. Choice of PostgreSQL host for the shared database, then `JOBAGENT_DATABASE_URL` and `JOBAGENT_MASTER_KEY` as secrets in Claude Code and Codex.

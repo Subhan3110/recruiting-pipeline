@@ -331,3 +331,23 @@ def test_multi_country_vacancy_needs_a_selectable_authorised_location(conn):
     ev = matching.evaluate(conn, add_vacancy(conn, location="Montreal; Warsaw; Bangalore", sid="m/1", employer="Multi Bank"))
     assert ev["decision"] == "auto_if_selectable" and ev["detail"]["geo"]["countries"] == ["PL"]
     assert matching.evaluate(conn, add_vacancy(conn, location="Warsaw; Krakow", sid="m/2", employer="PL Bank"))["decision"] == "auto"
+
+
+def test_consent_checkbox_options_accept_a_yes(conn):
+    opts = [{"label": "Acknowledge/Confirm", "value": 1}]
+    assert answers._pick_option(opts, "Yes")["value"] == 1
+    assert answers._pick_option([{"label": "No thanks", "value": 0}], "Yes") is None
+
+
+def test_how_heard_language_and_previous_application_answers(conn):
+    seed_profile(conn)
+    emp = employers.resolve(conn, "Fixture Bank")
+    apps.import_application(conn, {"company": "Fixture Bank", "role": "Analyst", "status": "Rejected", "applied": "2026-01-10", "source": "tracker"})
+    opt = lambda *labels: [{"label": lb, "value": i} for i, lb in enumerate(labels)]  # noqa: E731
+    assert answers._pick_option(opt("LinkedIn", "Career Page", "Referral"), "Company website")["label"] == "Career Page"
+    assert answers._pick_option(opt("LinkedIn", "Flow Traders Website"), "Company website")["label"] == "Flow Traders Website"
+    q = lambda label, name: {"label": label, "required": True, "description": "", "fields": [{"name": name, "type": "multi_value_single_select",  # noqa: E731
+                                                                                        "options": opt("Yes", "No", "Norwegian", "German")}]}
+    form = {"questions": [q("Have you previously applied to work at Fixture Bank?", "question_1"), q("Which language(s) are you fluent in other than English?", "question_2")]}
+    got = {a["field"]: a["value"] for a in answers.resolve_form(conn, form, {"employer_id": emp["id"]}, {"countries": ["NL"]})["answers"]}
+    assert got == {"question_1": "Yes", "question_2": "Norwegian"}

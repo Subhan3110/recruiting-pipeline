@@ -38,7 +38,7 @@ PATTERNS = [
     ("languages_other", r"language"),
     ("military", r"military|armed forces|veteran"),
     ("consent:marketing", r"marketing|talent (community|network|pool)|future (opportunit|vacanc)|keep (my|your) (data|details)|advertis|contact information"),
-    ("consent:privacy", r"privacy (policy|notice|statement)|data protection|gdpr|consent|acknowledge|i (have read|agree|confirm|certify)|terms"),
+    ("consent:privacy", r"^\s*privacy\s*$|privacy (policy|notice|statement)|data protection|gdpr|consent|acknowledge|i (have read|agree|confirm|certify)|terms"),
     ("preferred_location", r"(which|preferred|what) (office|location)|location (preference|of interest)|where would you (like|prefer)"),
     ("age_18", r"(over|at least|above) (the age of )?18|18 years"),
     ("non_compete", r"non-?compete|restrictive covenant|garden leave"),
@@ -120,9 +120,17 @@ def _pick_option(options: list[dict], text: str) -> dict | None:
         hits = [o for o in options if want.match(o["label"])]
         if len(hits) == 1:
             return hits[0]
+        if want is YES:  # consent boxes offer "Acknowledge/Confirm" rather than "Yes"
+            hits = [o for o in options if re.match(r"\s*(i\s+)?(acknowledge|confirm|agree|accept|consent)\b", o["label"], re.I)]
+            if len(hits) == 1:
+                return hits[0]
     hits = [o for o in options if t and (t in o["label"].lower() or o["label"].strip().lower() in t)]
     if len(hits) == 1:
         return hits[0]
+    if "website" in t or "career" in t:  # "Company website" -> "Career Page", "Careers Site", "Flow Traders Website"
+        hits = [o for o in options if re.search(r"career|company (web)?site|\bwebsite\b", o["label"], re.I)]
+        if len(hits) == 1:
+            return hits[0]
     # Last resort: exactly one option shares a distinctive word ("Company website" -> "Flow Traders Website").
     words = [w for w in re.findall(r"[a-z]{5,}", t) if w not in ("company", "other", "please", "prefer")]
     hits = [o for o in options if any(re.search(rf"\b{w}\b", o["label"].lower()) for w in words)]
@@ -152,6 +160,11 @@ def _profile_value(conn: Conn, key: str, country: str | None, employer_id: str, 
     loc = get("contact/location") or {}
     simple["current_location"] = (", ".join(x for x in (loc.get("city"), loc.get("country")) if x) or None, "contact/location")
     simple["location"] = simple["current_location"]
+    if key == "languages_other":
+        others = [f["value"]["language"] for f in profile.facts(conn, "languages/") if (not strict or f["status"] == "confirmed")
+                  and f["value"].get("language", "").lower() != "english"]
+        if others:
+            return "; ".join(others), "profile:languages"
     if key in simple:
         val, src = simple[key]
         return (str(val), f"profile:{src}") if val else (None, None)
@@ -171,7 +184,8 @@ def _profile_value(conn: Conn, key: str, country: str | None, employer_id: str, 
             if emp and any(normalise(n) == normalise(emp["name"]) for n in names):
                 worked = True
             return ("Yes" if worked else "No"), "profile:employment"
-        prior = conn.val("SELECT COUNT(*) FROM applications WHERE employer_id=? AND state IN ('submitted','uncertain')", (employer_id,))
+        prior = conn.val("SELECT COUNT(*) FROM applications WHERE employer_id=? AND (submitted_at IS NOT NULL OR state IN ('submitted','uncertain'))",
+                         (employer_id,))
         if prior:
             return "Yes", "application history"
         if complete:
