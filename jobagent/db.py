@@ -70,6 +70,16 @@ class Conn:
         cur = self.raw.execute(sql, tuple(params))
         return [dict(r) for r in cur.fetchall()] if cur.description else []
 
+    def many(self, sql: str, rows: list) -> None:
+        """Bulk insert with one statement and many parameter sets (far fewer round trips against a remote database)."""
+        if not rows:
+            return
+        if self.is_pg:
+            with self.raw.cursor() as cur:
+                cur.executemany(sql.replace("%", "%%").replace("?", "%s"), [tuple(r) for r in rows])
+        else:
+            self.raw.executemany(sql, [tuple(r) for r in rows])
+
     def one(self, sql: str, params: tuple | list = ()) -> dict | None:
         rows = self.q(sql, params)
         return rows[0] if rows else None

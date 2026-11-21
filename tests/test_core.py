@@ -378,3 +378,24 @@ def test_experience_region_and_compliance_questions(conn):
         qf("Will you require work sponsorship for your preferred location?", "q9", yn)]}
     got = {a["field"]: a["value"] for a in answers.resolve_form(conn, form, {"employer_id": "e"}, {"countries": ["FR"]})["answers"]}
     assert got == {"q1": "1-3 years", "q2": "UK", "q3": "No", "q4": "No", "q5": "No", "q6": "No", "q7": "No", "q8": "I understand", "q9": "No"}
+
+
+def test_portable_dump_moves_to_a_new_database_and_rebuilds_documents(conn, tmp_path):
+    seed_profile(conn)
+    vid = add_vacancy(conn)
+    matching.evaluate(conn, vid)
+    app = apps.ensure(conn, vid)
+    apps.prepare(conn, app["id"], FakeAdapter())
+    assert apps.get(conn, app["id"])["state"] == "prepared" and conn.val("SELECT COUNT(*) FROM documents") > 0
+    path = str(tmp_path / "p.json.gz")
+    counts = backup.dump(conn, path, portable=True)
+    assert "documents" not in counts and "secrets" not in counts
+    from cryptography.fernet import Fernet
+    import os
+    os.environ["JOBAGENT_MASTER_KEY"] = Fernet.generate_key().decode()           # a different key on the new database
+    fresh = db.connect(f"sqlite:///{tmp_path / 'new.db'}")
+    out = backup.restore(fresh, path)
+    assert out["applications_sent_back_to_preparation"] == 1 and profile.get_fact(fresh, "contact/email") == "test.candidate@example.com"
+    assert apps.get(fresh, app["id"])["state"] == "evaluated"
+    apps.prepare(fresh, app["id"], FakeAdapter())                                  # documents rebuilt under the new key
+    assert apps.get(fresh, app["id"])["state"] == "prepared" and fresh.val("SELECT COUNT(*) FROM documents") == 2

@@ -147,7 +147,8 @@ def cmd_serve(a):
 
 
 def cmd_backup(a):
-    print(backup.dump(_conn(), a.path))
+    """Write a backup (--portable leaves out encrypted documents and secrets, for moving to a new database)."""
+    print(backup.dump(_conn(), a.path, portable=a.portable))
 
 
 def cmd_restore(a):
@@ -179,7 +180,7 @@ def main(argv=None):
     add("run-once", cmd_run_once)
     add("worker", cmd_worker, ("--interval", {"type": int, "default": 300}))
     add("serve", cmd_serve, ("--host", {"default": "127.0.0.1"}), ("--port", {"type": int, "default": 8787}))
-    add("backup", cmd_backup, ("path", {}))
+    add("backup", cmd_backup, ("path", {}), ("--portable", {"action": "store_true"}))
     add("restore", cmd_restore, ("path", {}))
     add("set", cmd_set, ("key", {"choices": sorted(db.DEFAULT_SETTINGS) + ["mail_provider", "mail_imap_host", "mail_imap_user", "mail_imap_folder"]}),
         ("value", {"help": "JSON value, e.g. true"}))

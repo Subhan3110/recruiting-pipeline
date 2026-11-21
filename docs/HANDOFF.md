@@ -51,6 +51,10 @@ Prepared applications: 2 `queued` (Flow Traders Amsterdam internship, WorldQuant
 30 `needs_input` on employer-specific questions (AI-tool use, legal/preferred names, grades, subjects, office preferences), 10 `closed` (vacancy gone).
 Everything is still dry run: nothing has been submitted. A first live submission is the next task and needs the owner's go-ahead.
 
+## Shared database (2026-11-21)
+Owner created a free Supabase project (West EU, Data API off). Cloud sessions cannot reach Postgres (HTTPS-only egress, DNS for database hosts does not resolve), so the agent will run on the owner's computer:
+see `docs/LOCAL_SETUP.md`. `python -m jobagent backup --portable` + `restore` moves the data to a database with a new master key (verified into a local PostgreSQL). Not yet done: the owner has not run it, `doctor` has not been run against Supabase.
+
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.
 2. Compliance answers (PEP, relatives, referral, military, outstanding offers, AI-tool consent) and years of experience.

@@ -18,8 +18,8 @@ Every runtime gets the same two secrets and nothing else:
 3. In each runtime run `python -m jobagent doctor`. It reports database type, migration count, a master-key round trip and how many
    stored secrets decrypt, without printing any value. Record the result in `docs/HANDOFF.md`.
 
-Status: verified against a local PostgreSQL 16 only (full test suite). **No hosted shared database exists yet**; that needs the owner's choice of host.
-The cloud environment must also allow the database host on its network allowlist.
+Status: verified against a local PostgreSQL 16 only (full test suite, and a restore of the real data in 3 seconds). A Supabase project exists (West EU, free tier, Data API off) but is **not yet connected**.
+Cloud sessions have HTTPS-only egress and cannot resolve or reach Postgres hosts, so the shared database is used from the owner's computer or a hosted worker: see `LOCAL_SETUP.md`.
 
 ## Secrets
 `python -m jobagent secret-set <ref> --scope <mailbox|recruitment|api>` reads the value from stdin or a hidden prompt.
