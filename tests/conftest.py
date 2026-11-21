@@ -4,6 +4,7 @@ import pytest
 from cryptography.fernet import Fernet
 
 os.environ.setdefault("JOBAGENT_MASTER_KEY", Fernet.generate_key().decode())
+os.environ["JOBAGENT_LOGO_FETCH"] = "0"  # tests never download logos
 
 from jobagent import answers, db, policy, profile  # noqa: E402
 from jobagent.sources.base import Capabilities, SourceAdapter  # noqa: E402

@@ -70,6 +70,33 @@ EU_ONLY = re.compile(r"\b(?:must|need to|have to|required to|only)\b[^.\n]{0,40}
                      r"\b(?:EU|European Union)\s+(?:citizenship|nationality|passport)\s+(?:is\s+)?(?:required|mandatory|needed)", re.I)
 
 
+_MON = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+GRAD_BETWEEN = re.compile(r"graduat\w*\s+(?:date\s+)?(?:between|from)\s+(?:([a-z]{3,9})\.?\s+)?(20\d\d)\s+(?:and|to|-)\s+(?:([a-z]{3,9})\.?\s+)?(20\d\d)", re.I)
+GRAD_IN = re.compile(r"(?:graduat\w*\s+(?:in|by)\s+(?:([a-z]{3,9})\.?\s+)?|class of\s+)(20\d\d)\b", re.I)
+
+
+def graduation_check(desc: str, graduation: str | None) -> dict | None:
+    """Compare a stated graduation window ('Graduating in 2028', 'Class of 2028', 'graduating between Aug 2027 and Dec 2028')
+    with the candidate's expected graduation (YYYY-MM). 'preferred' windows never fail."""
+    if not graduation or not re.fullmatch(r"\d{4}-\d{2}", str(graduation)):
+        return None
+    gy, gm = map(int, str(graduation).split("-"))
+    for m in GRAD_BETWEEN.finditer(desc or ""):
+        lo = (int(m.group(2)), _MON.get((m.group(1) or "jan")[:3].lower(), 1))
+        hi = (int(m.group(4)), _MON.get((m.group(3) or "dec")[:3].lower(), 12))
+        ok = lo <= (gy, gm) <= hi
+        return {"result": "pass" if ok else "fail",
+                "reason": f"asks for graduation between {m.group(0).split(' ', 2)[-1]}; you graduate {graduation}" if not ok else "graduation date fits"}
+    for m in GRAD_IN.finditer(desc or ""):
+        year = int(m.group(2))
+        soft = re.search(r"prefer", desc[m.start():m.end() + 30], re.I)
+        if year != gy and not soft:
+            return {"result": "fail", "reason": f"asks for graduation in {year}; you graduate in {gy}"}
+        if year == gy:
+            return {"result": "pass", "reason": "graduation year fits"}
+    return None
+
+
 def _kw(pattern: str) -> re.Pattern:
     return re.compile(rf"(?<![a-z]){re.escape(pattern)}(?![a-z])", re.I)
 
@@ -212,6 +239,9 @@ def evaluate(conn: Conn, vacancy_id: str, llm=None) -> dict:
               "dismissed": {"result": "fail" if v["dismissed_at"] else "pass", "reason": "dismissed by user" if v["dismissed_at"] else ""},
               "seniority": sen, "language": lang, "education": edu, "work_authorisation": auth,
               "location": {"result": "unknown" if g["decision"] == "hold" else "pass", "reason": "; ".join(g["reasons"])}}
+    grad = graduation_check(desc, (profile.current_education(conn) or {}).get("graduation"))
+    if grad:
+        checks["graduation"] = grad
     if LICENCE_REQ.search(desc) and not profile.facts(conn, "licences/"):
         checks["licence"] = {"result": "fail", "reason": "requires a securities licence (FINRA/Series) that you do not hold"}
     if v["employer_uncertain"]:

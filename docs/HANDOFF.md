@@ -76,6 +76,13 @@ The worker now runs as three roles (finder, writer, applier), see `docs/AGENTS_R
 (`letters-needed`, `letter-add`), fact-checked, rendered to PDF by the writer role and attached by the applier. Verified on a sandbox copy: one letter
 written, accepted by the checks and rendered (1 page); a fabricated percentage and an em dash are rejected in tests.
 
+## Letter layout and logos (2026-11-21)
+Cover letters now follow the owner's template (see `docs/AGENTS_RUNTIME.md`): dated the day they are made, employer logo, contact block, employer name,
+salutation and sign-off added by the template, body written by the Claude writer in the owner's style (private fact `preferences/letter_example`).
+Logos: Greenhouse board logo, then Wikipedia logo files, then the website icon; verified live on a sandbox for IMC, Point72, Adyen, Jane Street,
+Flow Traders, Stripe, Brex and Monzo; Wikimedia rate-limits bursts, so requests are throttled. Vacancies whose stated graduation window
+excludes the owner's graduation (Sep 2027) are now rejected.
+
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.
 2. Compliance answers (PEP, relatives, referral, military, outstanding offers, AI-tool consent) and years of experience.

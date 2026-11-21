@@ -149,6 +149,7 @@ def _month_long(v) -> str:
 
 
 # -- writer agent: letters written by a Claude session, checked here before use ------------------------------
+INVENTED = re.compile(r"\b(podcast|webinar|coffee chat|spoke (with|to) (one of )?your|met (with )?(one of )?your|attended your|conversation with)\b", re.I)
 BANNED = re.compile(r"passionat|thrilled|dream (job|company)|esteemed|synerg|\bleverag", re.I)
 
 
@@ -163,9 +164,10 @@ def check_letter(conn: Conn, text: str, vacancy: dict) -> list[str]:
     problems = []
     if re.search(r"[\u2014\u2013]", text):
         problems.append("contains an em or en dash")
+    text = letter_body(text)
     words = len(re.findall(r"\b\w+\b", text))
-    if not 120 <= words <= 380:
-        problems.append(f"length {words} words (expected 120 to 380)")
+    if not 150 <= words <= 350:
+        problems.append(f"length {words} words (expected 150 to 350)")
     if vacancy["employer_name"].split()[0].lower() not in text.lower():
         problems.append("does not name the employer")
     if BANNED.search(text):
@@ -176,9 +178,9 @@ def check_letter(conn: Conn, text: str, vacancy: dict) -> list[str]:
         n = num.rstrip(".,")
         if n and n not in facts and n.lower() not in vac_text:
             problems.append(f"number {n!r} is not in your confirmed facts or the vacancy")
-    name = (profile.get_fact(conn, "identity/name", confirmed_only=True) or {}).get("full")
-    if name and name not in text:
-        problems.append("is not signed with your name")
+    for m in INVENTED.finditer(text):
+        if m.group(0).lower() not in facts.lower():
+            problems.append(f"mentions {m.group(0)!r}, which is not in your facts (no invented personal experiences)")
     return problems
 
 
@@ -208,18 +210,93 @@ def written_letter(conn: Conn, vacancy_id: str) -> str | None:
     return row["answer"] if row else None
 
 
-def render_letter(text: str, name: str) -> bytes:
+_FONTS: tuple[str, str] | None = None
+
+
+def _letter_fonts() -> tuple[str, str]:
+    """Calibri where installed (the owner's template uses it), else the metric-compatible Carlito, else Helvetica."""
+    global _FONTS
+    if _FONTS:
+        return _FONTS
+    import os
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    pairs = [
+        (os.environ.get("JOBAGENT_LETTER_FONT", ""), os.environ.get("JOBAGENT_LETTER_FONT_BOLD", "")),
+        ("/Applications/Microsoft Word.app/Contents/Resources/DFonts/Calibri.ttf", "/Applications/Microsoft Word.app/Contents/Resources/DFonts/Calibrib.ttf"),
+        ("/Library/Fonts/Calibri.ttf", "/Library/Fonts/Calibri Bold.ttf"),
+        (os.path.expanduser("~/Library/Fonts/Calibri.ttf"), os.path.expanduser("~/Library/Fonts/Calibri Bold.ttf")),
+        ("C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/calibrib.ttf"),
+        ("/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf", "/usr/share/fonts/truetype/crosextra/Carlito-Bold.ttf"),
+    ]
+    for reg, bold in pairs:
+        if reg and bold and os.path.exists(reg) and os.path.exists(bold):
+            try:
+                pdfmetrics.registerFont(TTFont("LetterBody", reg))
+                pdfmetrics.registerFont(TTFont("LetterBold", bold))
+                _FONTS = ("LetterBody", "LetterBold")
+                return _FONTS
+            except Exception:  # noqa: BLE001
+                continue
+    _FONTS = ("Helvetica", "Helvetica-Bold")
+    return _FONTS
+
+
+SALUTATION = re.compile(r"^\s*dear\b[^\n]*\n+", re.I)
+SIGNOFF = re.compile(r"\n+\s*(kind|best|warm)?\s*regards,?[\s\S]*$|\n+\s*(sincerely|yours (sincerely|faithfully)),?[\s\S]*$", re.I)
+
+
+def letter_body(text: str) -> str:
+    """The writer supplies body paragraphs; any salutation or sign-off it included is removed (the template adds its own)."""
+    return SIGNOFF.sub("", SALUTATION.sub("", text.strip())).strip()
+
+
+def render_letter(text: str, name: str, employer: str = "", contact: dict | None = None, logo_png: bytes | None = None,
+                  date_text: str | None = None) -> bytes:
+    """Cover letter in the owner's layout: date top right, employer logo, contact block, employer name centred,
+    'Dear <employer> team,', body, 'Kind Regards,' and name. Calibri 11 pt."""
+    import datetime as dt
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import mm
-    from reportlab.platypus import Paragraph, SimpleDocTemplate
+    from reportlab.platypus import Image as RLImage, Paragraph, SimpleDocTemplate, Spacer
     from xml.sax.saxutils import escape as e
 
-    body = ParagraphStyle("b", parent=getSampleStyleSheet()["BodyText"], fontSize=10.5, leading=15, spaceAfter=9)
+    reg, bold = _letter_fonts()
+    body = ParagraphStyle("body", fontName=reg, fontSize=11, leading=13.4, spaceAfter=11)
+    tight = ParagraphStyle("tight", parent=body, spaceAfter=0)
+    right = ParagraphStyle("right", parent=tight, alignment=TA_RIGHT)
+    title = ParagraphStyle("title", fontName=bold, fontSize=14, leading=17, alignment=TA_CENTER)
+    today = date_text or (lambda d: f"{d.day} {d.strftime('%B')}, {d.year}")(dt.date.today())
+    contact = contact or {}
+    story = [Paragraph(e(today), right), Spacer(1, 16 * mm if logo_png else 8 * mm)]
+    if logo_png:
+        from PIL import Image as PILImage
+        w, h = PILImage.open(io.BytesIO(logo_png)).size
+        scale = min(120 / w, 38 / h)  # at most 120 x 38 pt, like the template's logo
+        img = RLImage(io.BytesIO(logo_png), width=w * scale, height=h * scale)
+        img.hAlign = "LEFT"
+        story += [img, Spacer(1, 18 * mm)]
+    lines = []
+    if contact.get("email"):
+        lines.append(f'Email: <a href="mailto:{e(contact["email"])}" color="#0563C1"><u>{e(contact["email"])}</u></a>')
+    if contact.get("phone"):
+        lines.append(f"Phone: {e(contact['phone'])}")
+    if contact.get("address"):
+        lines.append(f"Address: {e(contact['address'])}")
+    story += [Paragraph(x, tight) for x in lines]
+    story += [Spacer(1, 14 * mm)]
+    if employer:
+        story += [Paragraph(e(employer), title), Spacer(1, 6 * mm), Paragraph(e(f"Dear {employer} team,"), body), Spacer(1, 6 * mm)]
+    for para in [p.strip() for p in re.split(r"\n\s*\n", letter_body(text)) if p.strip()]:
+        story.append(Paragraph(e(" ".join(para.split())), body))
+    story += [Spacer(1, 8 * mm), Paragraph("Kind Regards,", body), Paragraph(e(name), body)]
     out = io.BytesIO()
-    doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=25 * mm, rightMargin=25 * mm, topMargin=25 * mm, bottomMargin=25 * mm,
+    doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=25 * mm, rightMargin=25 * mm, topMargin=20 * mm, bottomMargin=20 * mm,
                             title=f"Cover letter {name}", author=name)
-    doc.build([Paragraph(e(p).replace("\n", "<br/>"), body) for p in text.split("\n\n")])
+    doc.build(story)
     return out.getvalue()
 
 
@@ -263,9 +340,25 @@ def build_for(conn: Conn, vacancy: dict, categories: list[str], needs: dict, str
     if needs.get("cover_letter"):
         text = written_letter(conn, vacancy["id"]) or compose_cover_letter(conn, vacancy, categories, strict)
         if text:
-            pdf = render_letter(text, data["name"])
-            problems += verify_pdf(pdf, [vacancy["employer_name"], data["name"]], max_pages=1)
-            docs["cover_letter"] = store(conn, "cover_letter", f"{slug}_Cover_Letter_{re.sub(r'[^A-Za-z0-9]+', '_', vacancy['employer_name'])}.pdf",
-                                         "application/pdf", pdf, {"source_hash": hashlib.sha256(text.encode()).hexdigest(), "text": text,
-                                                                 "vacancy_id": vacancy["id"], "strict": strict})
+            import datetime as dt
+            from . import logos
+            d = dt.date.today()
+            date_text = f"{d.day} {d.strftime('%B')}, {d.year}"
+            try:
+                logo = logos.get(conn, vacancy["employer_id"])
+            except Exception:  # noqa: BLE001 - a logo is optional; never block an application on it
+                logo = None
+            contact = {"email": data["email"], "phone": data["phone"],
+                       "address": profile.get_fact(conn, "contact/address", confirmed_only=strict)}
+            employer = vacancy["employer_name"]
+            pdf = render_letter(text, data["name"], employer, contact, logo, date_text)
+            problems += verify_pdf(pdf, [employer, data["name"], "Kind Regards"], max_pages=1)
+            body = letter_body(text)
+            # The date changes daily; approvals are bound to content_key (text, employer, logo), not to the PDF bytes.
+            content_key = hashlib.sha256(j({"text": body, "employer": employer, "logo": hashlib.sha256(logo).hexdigest() if logo else None,
+                                             "contact": contact}).encode()).hexdigest()
+            docs["cover_letter"] = store(conn, "cover_letter", f"{slug}_Cover_Letter_{re.sub(r'[^A-Za-z0-9]+', '_', employer)}.pdf",
+                                         "application/pdf", pdf, {"source_hash": hashlib.sha256((content_key + date_text).encode()).hexdigest(),
+                                                                 "content_key": content_key, "text": body, "date": date_text,
+                                                                 "vacancy_id": vacancy["id"], "strict": strict, "logo": bool(logo)})
     return docs, problems

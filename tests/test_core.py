@@ -552,7 +552,7 @@ def test_written_letters_are_fact_checked_and_attached(conn):
     need = pipeline.letters_needed(conn)
     assert need["vacancies"][0]["vacancy_id"] == vid and "employment/acme" in need["facts"]
     body = ("I am applying for the Compliance Analyst Intern role at Fixture Bank. At Acme Audit AS I work as an AML Assistant and screen "
-            "transactions against sanctions lists, which is the core of the monitoring and KYC work your team describes. ") * 3
+            "transactions against sanctions lists, which is the core of the monitoring and KYC work your team describes. ") * 4
     bad = documents.add_written_letter(conn, vid, body + "I raised conversion by 47% \u2014 quickly.\n\nKind regards,\nTest Candidate")
     assert not bad["ok"] and any("dash" in p for p in bad["problems"]) and any("47%" in p for p in bad["problems"])
     assert not documents.add_written_letter(conn, vid, "Too short. Fixture Bank. Test Candidate")["ok"]
@@ -565,7 +565,7 @@ def test_written_letters_are_fact_checked_and_attached(conn):
     app = apps.ensure(conn, vid)
     apps.prepare(conn, app["id"], FakeAdapter())
     meta, _ = documents.load(conn, apps.version(conn, app["id"])["document_ids"]["cover_letter"])
-    assert meta["meta"]["text"] == good.strip()
+    assert meta["meta"]["text"] == documents.letter_body(good)
 
 
 def test_yes_no_questions_employer_answers_and_multi_country_sponsorship(conn):
@@ -584,3 +584,88 @@ def test_yes_no_questions_employer_answers_and_multi_country_sponsorship(conn):
     assert got(["HK", "CN"]) == {"wq": "No", "cb": "Yes", "sp": "Yes"}        # both countries need sponsorship
     assert got(["NL"])["sp"] == "No"                                          # Amsterdam office of the same employer
     assert "sp" not in got(["NL", "HK"])                                     # countries disagree: ask, never guess
+
+
+def test_letter_layout_logo_and_invented_experiences(conn):
+    import io
+    from PIL import Image
+    from pypdf import PdfReader
+    from jobagent import logos
+    seed_profile(conn)
+    profile.set_fact(conn, "contact/address", "1 Example Street, London", "confirmed", "test")
+    vid = add_vacancy(conn)
+    pipeline_mod = __import__("jobagent.pipeline", fromlist=["x"])
+    pipeline_mod.evaluate_pending(conn)
+    v = vacancies.get(conn, vid)
+    buf = io.BytesIO(); Image.new("RGB", (300, 90), (20, 60, 140)).save(buf, "PNG")
+    assert logos.set_manual(conn, v["employer_id"], buf.getvalue())
+    assert not logos.set_manual(conn, v["employer_id"], b"<html>not an image</html>")
+    body = ("I'm an MSc Finance student, and the KYC and transaction monitoring work at Fixture Bank is close to what I did at Acme Audit AS, "
+            "where I screened transactions against sanctions lists. ") * 5
+    bad = documents.add_written_letter(conn, vid, "I first heard about you on a podcast. " + body)
+    assert not bad["ok"] and any("podcast" in p for p in bad["problems"])
+    assert documents.add_written_letter(conn, vid, "Dear Fixture Bank team,\n\n" + body + "\n\nKind regards,\nTest Candidate")["ok"]
+    docs, problems = documents.build_for(conn, v, [], {"cover_letter": True})
+    assert problems == []
+    meta, pdf = documents.load(conn, docs["cover_letter"])
+    page = PdfReader(io.BytesIO(pdf)).pages[0]
+    text = page.extract_text()
+    import datetime as dt
+    d = dt.date.today()
+    assert f"{d.day} {d.strftime('%B')}, {d.year}" in text and "Email: test.candidate@example.com" in text
+    assert "Address: 1 Example Street, London" in text and "Dear Fixture Bank team," in text
+    assert text.count("Kind Regards") == 1 and text.count("Dear ") == 1 and "Test Candidate" in text
+    assert len(page.images) == 1 and meta["meta"]["logo"] is True and "content_key" in meta["meta"]
+
+
+def test_logo_fetch_order_and_untrusted_downloads(conn):
+    import io
+    from PIL import Image
+    from jobagent import logos
+    seed_profile(conn)
+    add_vacancy(conn, employer="Fixture Bank", sid="fixturebank/1")
+    emp = employers.find(conn, "Fixture Bank")
+
+    def png(w, h):
+        b = io.BytesIO(); Image.new("RGB", (w, h), (0, 0, 0)).save(b, "PNG"); return b.getvalue()
+
+    class R:
+        def __init__(self, status=200, ctype="text/html", content=b"", text="", js=None):
+            self.status_code, self.headers, self.content, self.text, self._js = status, {"Content-Type": ctype}, content, text, js
+        def json(self):
+            return self._js
+
+    class S:
+        def __init__(self, routes):
+            self.routes, self.seen = routes, []
+        def get(self, url, **kw):
+            self.seen.append(url)
+            for k, v in self.routes.items():
+                if k in url and (not isinstance(v, dict) or kw.get("params", {}).get("list") == v.get("list")):
+                    return v["r"] if isinstance(v, dict) else v
+            return R(404)
+
+    # 1. Greenhouse board logo wins when published.
+    s = S({"job-boards.greenhouse.io/fixturebank": R(text='"logo":{"href":null,"url":"https://cdn.example/logo.png"}'),
+           "cdn.example/logo.png": R(ctype="image/png", content=png(400, 120))})
+    assert logos.fetch(conn, emp["id"], s) == {"status": "ok", "source": "greenhouse", "url": "https://cdn.example/logo.png"}
+    # 2. Wikipedia only when the article image is a logo; a photo is ignored.
+    s = S({"job-boards.greenhouse.io": R(text='"logo":{"href":null,"url":null}'),
+           "w/api.php": {"list": "search", "r": R(js={"query": {"search": [{"title": "Fixture Bank"}]}})},
+           "w/api.php ": None})
+    s.routes["w/api.php"] = {"list": "search", "r": R(js={"query": {"search": [{"title": "Fixture Bank"}]}})}
+    s.routes["en.wikipedia.org/w/api.php"] = {"list": None, "r": R(js={"query": {"pages": {"1": {"pageimage": "Fixture_HQ_photo.jpg",
+                                                                                                "thumbnail": {"source": "https://upload.example/hq.jpg"}}}}})}
+    assert logos.fetch(conn, emp["id"], s)["status"] == "none"
+    # 3. Non-images, SVG and tiny icons are rejected; nothing is stored.
+    assert logos._to_png(b"<svg></svg>") is None and logos._to_png(png(16, 16)) is None and logos._to_png(png(200, 80)) is not None
+    assert logos.get(conn, emp["id"], allow_fetch=False) is None
+
+
+def test_graduation_windows():
+    g = matching.graduation_check
+    assert g("Graduating in 2028 with a BSc./MSc", "2027-09")["result"] == "fail"
+    assert g("Graduating between August 2027 and December 2028 with a Degree", "2027-09")["result"] == "pass"
+    assert g("Graduating between January 2028 and December 2028", "2027-09")["result"] == "fail"
+    assert g("Class of 2028, preferred", "2027-09") is None
+    assert g("Class of 2027", "2027-09")["result"] == "pass" and g("No dates here", "2027-09") is None

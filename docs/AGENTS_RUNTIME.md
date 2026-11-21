@@ -17,8 +17,16 @@ A Claude session acts as the writer:
 1. `python -m jobagent letters-needed --limit 5` gives the vacancies that need a letter, the rules and the facts that may be used.
 2. Claude writes one letter per vacancy from those facts only, then stores it:
    `python -m jobagent letter-add <vacancy_id> - <<'TXT' ... TXT`
-3. The letter is checked before it can be used: no em or en dashes, 120 to 380 words, names the employer, signed with your name,
-   no generic phrases, and every number must appear in your confirmed facts or the vacancy. A rejected letter prints the reasons.
+3. The letter is checked before it can be used: no em or en dashes, 150 to 350 words, names the employer, no generic phrases,
+   no invented personal experiences (podcasts, conversations, events), and every number must appear in your confirmed facts or the
+   vacancy. A rejected letter prints the reasons. Claude writes the body only and follows your example letter (`preferences/letter_example`).
+
+## Letter layout (owner's template, 2026-11-21)
+Date top right ("21 November, 2026", the day the PDF is made), employer logo on the left, contact block (Email, Phone, Address),
+employer name centred in bold, "Dear <employer> team,", the body, "Kind Regards," and the name. Calibri 11 pt where installed,
+otherwise Carlito (same metrics). Logos come from the employer's Greenhouse board, then the company's Wikipedia article (only files
+named as a logo), then the website icon; downloads are validated and re-encoded to PNG, and a letter without a logo is still valid.
+Set a logo by hand with `python -m jobagent logo-set "<employer>" <image file>`. A new date alone does not require a new approval.
 4. The writer worker renders accepted letters to PDF and the applier attaches exactly that PDF. Each application version records it.
 
 Claims must paraphrase confirmed facts, not extend them. No paid model API is used; the writing happens in your Claude session.

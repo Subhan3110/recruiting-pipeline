@@ -183,6 +183,29 @@ def cmd_letter_add(a):
     print(json.dumps(documents.add_written_letter(_conn(), a.vacancy_id, text)))
 
 
+def cmd_logo_set(a):
+    """Use your own logo image for an employer's cover letters."""
+    from . import employers, logos
+    conn = _conn()
+    emp = employers.find(conn, a.employer)
+    if not emp:
+        sys.exit(f"no employer called {a.employer!r}")
+    ok = logos.set_manual(conn, emp["id"], open(a.file, "rb").read())
+    print("logo stored" if ok else "not a usable image")
+
+
+def cmd_logo_fetch(a):
+    """Fetch logos for employers that have letters to write (or one employer)."""
+    from . import employers, logos
+    conn = _conn()
+    ids = [employers.find(conn, a.employer)["id"]] if a.employer else [r["employer_id"] for r in conn.q(
+        "SELECT DISTINCT v.employer_id FROM vacancies v JOIN evaluations ev ON ev.vacancy_id=v.id AND ev.is_current=1 "
+        "WHERE v.status='open' AND ev.decision IN ('auto','auto_if_selectable','approval')")]
+    for eid in ids:
+        name = conn.val("SELECT name FROM employers WHERE id=?", (eid,))
+        print(name, logos.fetch(conn, eid)["status"])
+
+
 def cmd_serve(a):
     import uvicorn
     from .web import create_app
@@ -226,6 +249,8 @@ def main(argv=None):
     add("reprepare", cmd_reprepare)
     add("mail-relay-add", cmd_mail_relay_add, ("file", {"help": "JSON file or - for stdin"}), ("--provider", {"default": "gmail_connector"}))
     add("mail-relay-needs", cmd_mail_relay_needs)
+    add("logo-set", cmd_logo_set, ("employer", {}), ("file", {}))
+    add("logo-fetch", cmd_logo_fetch, ("--employer", {"default": ""}))
     add("letters-needed", cmd_letters_needed, ("--limit", {"type": int, "default": 10}))
     add("letter-add", cmd_letter_add, ("vacancy_id", {}), ("file", {"help": "text file or - for stdin"}))
     add("worker", cmd_worker, ("--interval", {"type": int, "default": 300}), ("--role", roles))

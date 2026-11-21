@@ -118,7 +118,10 @@ def prepare(conn: Conn, app_id: str, adapter, evaluation: dict | None = None) ->
     for a in resolved["answers"]:
         if a["type"] == "input_file" and a["required"] and a["key"] not in docs:
             problems.append(f"required document '{a['key']}' could not be generated from confirmed facts")
-    doc_shas = {k: conn.val("SELECT sha256 FROM documents WHERE id=?", (d,)) for k, d in docs.items()}
+    doc_shas = {}
+    for k, d in docs.items():  # a cover letter is identified by its content, so a new date alone does not need a new approval
+        row = conn.one("SELECT sha256, meta FROM documents WHERE id=?", (d,))
+        doc_shas[k] = (unj(row["meta"], {}) or {}).get("content_key") or row["sha256"]
     chash = content_hash(v["id"], resolved, doc_shas)
     geo_decision = ev_detail["geo"]["decision"]
     needs_approval = geo_decision == "approval" or (geo_decision == "auto_if_selectable" and not resolved["location_selectable"])
