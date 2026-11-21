@@ -193,10 +193,11 @@ def add_written_letter(conn: Conn, vacancy_id: str, text: str, author: str = "wr
     if problems:
         conn.event("letter.rejected", "vacancy", vacancy_id, {"problems": problems}, actor=author)
         return {"ok": False, "problems": problems}
-    conn.q("INSERT INTO answers (id, question_key, scope_type, scope_value, answer, status, source, confirmed_at, created_at) "
-           "VALUES (?,?,?,?,?,?,?,?,?)", (new_id("ans"), "letter", "employer", vacancy_id, text, "confirmed", author, now(), now()))
-    conn.q("UPDATE answers SET superseded_at=? WHERE question_key='letter' AND scope_value=? AND superseded_at IS NULL AND answer<>?",
-           (now(), vacancy_id, text))
+    with conn.tx():  # a newer letter for the same vacancy replaces the old one; the old text stays in history
+        conn.q("UPDATE answers SET superseded_at=? WHERE question_key='letter' AND scope_type='employer' AND scope_value=? AND superseded_at IS NULL",
+               (now(), vacancy_id))
+        conn.q("INSERT INTO answers (id, question_key, scope_type, scope_value, answer, status, source, confirmed_at, created_at) "
+               "VALUES (?,?,?,?,?,?,?,?,?)", (new_id("ans"), "letter", "employer", vacancy_id, text, "confirmed", author, now(), now()))
     conn.event("letter.accepted", "vacancy", vacancy_id, {"words": len(text.split())}, actor=author)
     return {"ok": True, "problems": []}
 

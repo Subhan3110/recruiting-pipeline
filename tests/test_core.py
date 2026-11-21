@@ -559,6 +559,9 @@ def test_written_letters_are_fact_checked_and_attached(conn):
     good = body + "I can start in June.\n\nKind regards,\nTest Candidate"
     assert documents.add_written_letter(conn, vid, good) == {"ok": True, "problems": []}
     assert pipeline.letters_needed(conn)["vacancies"] == []
+    assert documents.add_written_letter(conn, vid, good.replace("June", "July"))["ok"]          # a rewrite replaces the letter
+    assert documents.written_letter(conn, vid).count("July") == 1
+    assert documents.add_written_letter(conn, vid, good)["ok"]
     app = apps.ensure(conn, vid)
     apps.prepare(conn, app["id"], FakeAdapter())
     meta, _ = documents.load(conn, apps.version(conn, app["id"])["document_ids"]["cover_letter"])
