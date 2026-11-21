@@ -45,6 +45,12 @@ Live state: 206 vacancies at 25 employers are automatic-eligible; 42 application
 politically-exposed-person / relative / referral questions, military service, years of experience, AI-tool consents and outstanding-offers. No form was submitted or dry-run with real data
 (attaching a CV on a Greenhouse form uploads it to Greenhouse storage even without submitting, so live fills use the synthetic profile only).
 
+## Update 2026-11-21 (evening)
+Owner confirmed their current city and answered the compliance questions (details live only in the private database; this repository is public).
+Prepared applications: 2 `queued` (Flow Traders Amsterdam internship, WorldQuant New York), 1 `awaiting_approval` (Ripple, London),
+30 `needs_input` on employer-specific questions (AI-tool use, legal/preferred names, grades, subjects, office preferences), 10 `closed` (vacancy gone).
+Everything is still dry run: nothing has been submitted. A first live submission is the next task and needs the owner's go-ahead.
+
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.
 2. Compliance answers (PEP, relatives, referral, military, outstanding offers, AI-tool consent) and years of experience.

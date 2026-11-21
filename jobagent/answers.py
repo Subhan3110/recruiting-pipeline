@@ -18,6 +18,15 @@ NO = re.compile(r"^\s*(no|nei|false|n)\b", re.I)
 PATTERNS = [
     ("sponsorship:", r"sponsor|work (permit|visa)|employment pass|visa (support|assistance)|require .* visa"),
     ("work_auth:", r"(authori[sz]ed|eligible|legally (able|permitted|entitled)|right|permission|entitled) to work|work authori[sz]ation|legal right to work"),
+    ("experience_years", r"years? of (work |professional |relevant |full[- ]time )?experience|how many years"),
+    ("pep", r"government official|politically exposed|public (office|official|function)"),
+    ("outstanding_offers", r"outstanding offer|other offers|competing offer|offers or deadlines"),
+    ("ai_use", r"how you use ai|use ai tools today|your use of ai"),
+    ("referred", r"were you referred|referred (by|to this)|employee referral\?"),
+    ("current_region", r"region you are (currently )?(located|situated|based)|region .{0,30}(situated|studying)"),
+    ("address", r"(street|postal|mailing|home|residential) address|address line"),
+    ("first_name", r"^\s*(legal |preferred |given )?first name"),
+    ("last_name", r"^\s*(legal )?(last|family) name|^\s*surname"),
     ("linkedin", r"linkedin"),
     ("website", r"website|portfolio|github"),
     ("heard_from", r"how did you (hear|learn|find)|where did you (hear|find|learn)|source of application|referred by"),
@@ -38,8 +47,8 @@ PATTERNS = [
     ("languages_other", r"language"),
     ("military", r"military|armed forces|veteran"),
     ("consent:marketing", r"marketing|talent (community|network|pool)|future (opportunit|vacanc)|keep (my|your) (data|details)|advertis|contact information"),
-    ("consent:privacy", r"^\s*privacy\s*$|privacy (policy|notice|statement)|data protection|gdpr|consent|acknowledge|i (have read|agree|confirm|certify)|terms"),
-    ("preferred_location", r"(which|preferred|what) (office|location)|location (preference|of interest)|where would you (like|prefer)"),
+    ("consent:privacy", r"^\s*privacy\s*$|be advised|may use ai|use ai tools to assist|ai tools to assist|recorded|privacy (policy|notice|statement)|data protection|gdpr|consent|acknowledge|i (have read|agree|confirm|certify)|terms"),
+    ("preferred_location", r"(which|preferred|what) (work )?(office|location)|preferred (work )?(office|location)|location (preference|of interest)|where would you (like|prefer)"),
     ("age_18", r"(over|at least|above) (the age of )?18|18 years"),
     ("non_compete", r"non-?compete|restrictive covenant|garden leave"),
     ("relatives", r"relative|family member|personal relationship"),
@@ -110,8 +119,35 @@ def library(conn: Conn) -> list[dict]:
 
 
 # -- form resolution --------------------------------------------------------------
+def _by_number(options: list[dict], n: int) -> dict | None:
+    """Pick the option whose range contains n: '1-3 years', '5+', 'less than 1', '2 years'."""
+    for o in options:
+        lab = o["label"].lower()
+        m = re.search(r"(\d+)\s*(?:-|–|to)\s*(\d+)", lab)
+        if m and int(m.group(1)) <= n <= int(m.group(2)):
+            return o
+        m = re.search(r"(?:less than|under|fewer than|<)\s*(\d+)", lab)
+        if m and n < int(m.group(1)):
+            return o
+        m = re.search(r"(?:more than|over|>)\s*(\d+)", lab)
+        if m and n > int(m.group(1)):
+            return o
+        m = re.search(r"(\d+)\s*(?:\+|or more|plus)", lab)
+        if m and n >= int(m.group(1)):
+            return o
+        if re.fullmatch(rf"\s*{n}(\s*years?)?\s*", lab):
+            return o
+    return None
+
+
+REGION_ALIASES = {"GB": ["UK", "United Kingdom", "Great Britain", "Europe", "EMEA"], "US": ["United States", "USA", "North America"],
+                  "NO": ["Norway", "Europe", "EMEA"]}
+
+
 def _pick_option(options: list[dict], text: str) -> dict | None:
     t = text.strip().lower()
+    if t.isdigit() and (hit := _by_number(options, int(t))):
+        return hit
     for o in options:
         if o["label"].strip().lower() == t:
             return o
@@ -121,7 +157,7 @@ def _pick_option(options: list[dict], text: str) -> dict | None:
         if len(hits) == 1:
             return hits[0]
         if want is YES:  # consent boxes offer "Acknowledge/Confirm" rather than "Yes"
-            hits = [o for o in options if re.match(r"\s*(i\s+)?(acknowledge|confirm|agree|accept|consent)\b", o["label"], re.I)]
+            hits = [o for o in options if re.match(r"\s*(i\s+)?(acknowledge|confirm|agree|accept|consent|understand)\b", o["label"], re.I)]
             if len(hits) == 1:
                 return hits[0]
     hits = [o for o in options if t and (t in o["label"].lower() or o["label"].strip().lower() in t)]
@@ -160,6 +196,15 @@ def _profile_value(conn: Conn, key: str, country: str | None, employer_id: str, 
     loc = get("contact/location") or {}
     simple["current_location"] = (", ".join(x for x in (loc.get("city"), loc.get("country")) if x) or None, "contact/location")
     simple["location"] = simple["current_location"]
+    if key == "experience_years":
+        years = profile.experience_years(conn, strict)
+        return (str(years), "profile:employment (computed from confirmed employment dates)") if years is not None else (None, None)
+    if key == "current_region":
+        for alias in REGION_ALIASES.get(geo.country_of((get("contact/location") or {}).get("country", "")) or "", []):
+            return alias, "profile:contact/location"
+    if key == "address":
+        addr = get("contact/address")
+        return (str(addr), "profile:contact/address") if addr else (None, None)
     if key == "languages_other":
         others = [f["value"]["language"] for f in profile.facts(conn, "languages/") if (not strict or f["status"] == "confirmed")
                   and f["value"].get("language", "").lower() != "english"]
@@ -234,6 +279,10 @@ def resolve_form(conn: Conn, form: dict, vacancy: dict, geo_eval: dict, strict: 
                 out["missing"].append(entry | {"options": [o["label"] for o in options], "why": "no eligible location among the options"})
             continue
         text, source = _profile_value(conn, key, country, employer_id, strict, q["label"])
+        if text is None and key.endswith(":?") and countries:
+            found = {_profile_value(conn, key[:-1] + cc, cc, employer_id, strict, q["label"]) for cc in countries}
+            if len(found) == 1 and next(iter(found))[0] is not None:
+                text, source = next(iter(found))
         if text is None:
             lib = lookup(conn, key, employer_id, country or (countries[0] if len(countries) == 1 else None), allow_proposed=not strict)
             if lib:
@@ -247,6 +296,18 @@ def resolve_form(conn: Conn, form: dict, vacancy: dict, geo_eval: dict, strict: 
             continue
         if options:
             wanted = [t.strip() for t in text.split(";")] if ftype == "multi_value_multi_select" else [text]
+            if key in ("university", "graduation_date") and ftype != "multi_value_multi_select":
+                cands = [text]
+                if key == "university":
+                    cands += (profile.current_education(conn, strict) or {}).get("aliases", [])
+                elif re.fullmatch(r"\d{4}-\d{2}", text):
+                    import datetime as dt
+                    d = dt.datetime.strptime(text, "%Y-%m")
+                    cands += [d.strftime("%B %Y"), d.strftime("%b %Y"), d.strftime("%m/%Y"), d.strftime("%Y")]
+                wanted = [next((c_ for c_ in cands if _pick_option(options, c_)), text)]
+            if key == "current_region":
+                loc_c = geo.country_of((profile.get_fact(conn, "contact/location", confirmed_only=strict) or {}).get("country", ""))
+                wanted = [next((a for a in REGION_ALIASES.get(loc_c, []) if _pick_option(options, a)), text)]
             picked = [_pick_option(options, w) for w in wanted]
             if any(p is None for p in picked):
                 (out["missing"] if q["required"] else out["skipped"]).append(

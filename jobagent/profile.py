@@ -164,3 +164,32 @@ def work_auth_fact(conn: Conn, country: str, strict: bool = True) -> tuple[dict 
         if fact is not None:
             return fact, key
     return None, None
+
+
+def experience_years(conn: Conn, strict: bool = True) -> int | None:
+    """Whole years of work experience from confirmed employment dates (overlapping jobs counted once)."""
+    from datetime import date
+
+    spans = []
+    for f in facts(conn, "employment/"):
+        if strict and f["status"] not in ("confirmed", "preference"):
+            continue
+        v = f["value"]
+        try:
+            y, m = map(int, str(v["start"]).split("-")[:2])
+            end = str(v["end"]).split("-")[:2] if v.get("end") else [str(date.today().year), str(date.today().month)]
+            ey, em = map(int, end)
+        except (KeyError, ValueError):
+            continue
+        spans.append((y * 12 + m, ey * 12 + em))
+    if not spans:
+        return None
+    spans.sort()
+    total, (cs, ce) = 0, spans[0]
+    for s_, e_ in spans[1:]:
+        if s_ <= ce:
+            ce = max(ce, e_)
+        else:
+            total += ce - cs
+            cs, ce = s_, e_
+    return (total + ce - cs) // 12

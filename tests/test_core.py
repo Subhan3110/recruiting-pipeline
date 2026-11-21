@@ -351,3 +351,30 @@ def test_how_heard_language_and_previous_application_answers(conn):
     form = {"questions": [q("Have you previously applied to work at Fixture Bank?", "question_1"), q("Which language(s) are you fluent in other than English?", "question_2")]}
     got = {a["field"]: a["value"] for a in answers.resolve_form(conn, form, {"employer_id": emp["id"]}, {"countries": ["NL"]})["answers"]}
     assert got == {"question_1": "Yes", "question_2": "Norwegian"}
+
+
+def test_experience_region_and_compliance_questions(conn):
+    seed_profile(conn)
+    profile.set_fact(conn, "employment/b", {"employer": "B AS", "title": "Advisor", "start": "2024-06", "end": "2026-08"}, "confirmed", "cv")
+    profile.set_fact(conn, "employment/acme", {"employer": "Acme Audit AS", "title": "AML", "start": "2025-09", "end": "2026-08"}, "confirmed", "cv")
+    assert profile.experience_years(conn) == 2                       # overlapping jobs counted once: 26 months
+    profile.set_fact(conn, "contact/location", {"city": "London", "country": "United Kingdom"}, "confirmed", "user")
+    profile.set_fact(conn, "work_auth/EEA", {"authorised": True, "needs_sponsorship": False}, "confirmed", "user")
+    for k in ("pep", "relatives", "military", "referred", "outstanding_offers"):
+        answers.set_answer(conn, k, "No", source="user")
+    answers.set_answer(conn, "consent:privacy", "Yes", source="user")
+    opt = lambda *l: [{"label": x, "value": i} for i, x in enumerate(l)]  # noqa: E731
+    yn, qf = opt("Yes", "No"), lambda label, name, options: {"label": label, "required": True, "description": "", "fields": [  # noqa: E731
+        {"name": name, "type": "multi_value_single_select", "options": options}]}
+    form = {"questions": [
+        qf("Years of Work Experience", "q1", opt("Less than 1", "1-3 years", "3-5 years", "5+ years")),
+        qf("Please select the region you are currently located in", "q2", opt("Europe", "UK", "North America")),
+        qf("Are you a current government official or were you one in the last five years?", "q3", yn),
+        qf("Are you a close relative of a government official?", "q4", yn),
+        qf("Were you referred to this position by a senior leader?", "q5", yn),
+        qf("Do you have any outstanding offers or deadlines?", "q6", yn),
+        qf("Have you served in the military?", "q7", yn),
+        qf("I understand that Acme may use AI tools to assist in the application process.", "q8", opt("I understand", "Decline")),
+        qf("Will you require work sponsorship for your preferred location?", "q9", yn)]}
+    got = {a["field"]: a["value"] for a in answers.resolve_form(conn, form, {"employer_id": "e"}, {"countries": ["FR"]})["answers"]}
+    assert got == {"q1": "1-3 years", "q2": "UK", "q3": "No", "q4": "No", "q5": "No", "q6": "No", "q7": "No", "q8": "I understand", "q9": "No"}
