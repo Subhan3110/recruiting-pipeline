@@ -6,6 +6,7 @@ application, so a second application to the same vacancy cannot exist.
 from __future__ import annotations
 
 import hashlib
+import re
 
 from . import answers as answers_mod, db, documents, employers, matching, policy as policy_mod, profile, vacancies
 from .db import Conn, j, new_id, now, unj
@@ -107,6 +108,10 @@ def prepare(conn: Conn, app_id: str, adapter, evaluation: dict | None = None) ->
         vacancies.close(conn, v["id"], "application form no longer available")
         transition(conn, app_id, "closed", "vacancy closed before preparation")
         return {"state": "closed"}
+    if any(matching.LICENCE_REQ.search(q["label"]) for q in form["questions"]) and not profile.facts(conn, "licences/"):
+        if conn.val("SELECT state FROM applications WHERE id=?", (app_id,)) not in OCCUPYING + ("closed",):
+            transition(conn, app_id, "closed", "the application form says a securities licence (FINRA/Series) is required; none held")
+        return {"state": "closed"}
     resolved = answers_mod.resolve_form(conn, form, v, ev_detail["geo"], strict=True)
     docs, problems = documents.build_for(conn, v, ev_detail["relevance"]["categories"], resolved["needs"], strict=True)
     gaps = [f"{m['label']}" + (f" (options: {', '.join(m['options'][:12])})" if m.get("options") else "") for m in resolved["missing"]]
@@ -136,7 +141,9 @@ def prepare(conn: Conn, app_id: str, adapter, evaluation: dict | None = None) ->
             return {"state": state, "version": ver}
         if gaps or problems:
             for m in resolved["missing"]:
-                profile.open_task(conn, "question", f"Answer needed: {m['label']}",
+                long_q = m["type"] == "textarea" or re.search(r"elaborate|describe|explain|tell us|why do you|motivat|cover letter|\bwords\b", m["label"], re.I)
+                profile.open_task(conn, "long_answer" if long_q else "question",
+                                  ("Longer answer requested (flagged for you): " if long_q else "Answer needed: ") + m["label"],
                                   f"Asked by {v['employer_name']} ({v['title']}). " + (f"Options: {', '.join(m['options'][:20])}. " if m.get("options") else "")
                                   + f"Reason: {m['why']}. Key: {m['key']}", "answer", m["key"],
                                   dedup_key=f"ans:{m['key']}:{'' if not m['key'].startswith('q:') else v['employer_id']}")

@@ -58,6 +58,14 @@ see `docs/LOCAL_SETUP.md`. `python -m jobagent backup --portable` + `restore` mo
 (database, master key, profile), interface serving on the Mac. **Supabase is now the single source of truth.** The cloud container's SQLite copy is retired and paused.
 Dry run no longer attaches documents on real employer forms (Greenhouse stores attachments on selection); the worker must `git pull` this change before it runs.
 
+## Standing answers (2026-11-21, late)
+The owner supplied answers for the remaining form questions (connections, military, licences, nationality, demographics, AI use). They live in a private answers file
+imported with `python -m jobagent profile-import <file>` on the owner's Mac, never in this repository. Answer matching now handles ordered fallbacks (`A || B`),
+self-identification questions by topic, visa-status and right-to-work option lists, office/relocation questions, date formats and season options, "Other" options,
+and never writes em or en dashes in free text. Questions asking for longer text become `long_answer` tasks for the owner. Forms or descriptions that require a FINRA
+licence close the application. Sandbox check against the live forms of the 33 unfinished applications: 1 left needing input (a flagged long answer), the rest prepared or queued.
+Next on the Mac: `git pull`, `profile-import` the answers file, `python -m jobagent reprepare`.
+
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.
 2. Compliance answers (PEP, relatives, referral, military, outstanding offers, AI-tool consent) and years of experience.

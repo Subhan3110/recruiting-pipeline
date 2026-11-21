@@ -64,6 +64,8 @@ ADV_DEGREE = re.compile(r"\b(master'?s?|msc|m\.sc|mba|ph\.?d|doctorate|postgradu
                         r"\b(pursuing|enrolled in|studying)\b[^.\n]{0,30}\b(master'?s?|msc|mba|ph\.?d)\b(?![^.\n]{0,25}\b(or|/)\b[^.\n]{0,15}bachelor)", re.I)
 
 
+LICENCE_REQ = re.compile(r"\b(finra|series\s?(7|24|27|57|63|65|66|79|99))\b[^.\n]{0,80}\b(required|must|mandatory)\b|"
+                         r"\b(required|must (hold|have)|mandatory)\b[^.\n]{0,60}\b(finra|series\s?\d{1,2})\b", re.I)
 EU_ONLY = re.compile(r"\b(?:must|need to|have to|required to|only)\b[^.\n]{0,40}\b(?:EU|European Union)\s+(?:citizen|national|passport)|"
                      r"\b(?:EU|European Union)\s+(?:citizenship|nationality|passport)\s+(?:is\s+)?(?:required|mandatory|needed)", re.I)
 
@@ -208,6 +210,8 @@ def evaluate(conn: Conn, vacancy_id: str, llm=None) -> dict:
               "dismissed": {"result": "fail" if v["dismissed_at"] else "pass", "reason": "dismissed by user" if v["dismissed_at"] else ""},
               "seniority": sen, "language": lang, "education": edu, "work_authorisation": auth,
               "location": {"result": "unknown" if g["decision"] == "hold" else "pass", "reason": "; ".join(g["reasons"])}}
+    if LICENCE_REQ.search(desc) and not profile.facts(conn, "licences/"):
+        checks["licence"] = {"result": "fail", "reason": "requires a securities licence (FINRA/Series) that you do not hold"}
     if v["employer_uncertain"]:
         checks["employer_identity"] = {"result": "unknown", "reason": "employer may be the same as one already on file; confirm before applying"}
     if v["needs_reconciliation"]:

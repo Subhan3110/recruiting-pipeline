@@ -190,7 +190,7 @@ def test_missing_required_answer_becomes_a_question(conn):
     app = apps.ensure(conn, vid)
     res = apps.prepare(conn, app["id"], FakeAdapter(questions=q))
     assert res["state"] == "needs_input"
-    assert conn.one("SELECT 1 FROM user_tasks WHERE kind='question' AND title LIKE '%favourite asset class%'")
+    assert conn.one("SELECT 1 FROM user_tasks WHERE kind='long_answer' AND title LIKE 'Longer answer requested%favourite asset class%'")
 
 
 # -- documents ---------------------------------------------------------------------
@@ -399,3 +399,101 @@ def test_portable_dump_moves_to_a_new_database_and_rebuilds_documents(conn, tmp_
     assert apps.get(fresh, app["id"])["state"] == "evaluated"
     apps.prepare(fresh, app["id"], FakeAdapter())                                  # documents rebuilt under the new key
     assert apps.get(fresh, app["id"])["state"] == "prepared" and fresh.val("SELECT COUNT(*) FROM documents") == 2
+
+
+def test_owner_style_answers_on_real_form_wording(conn):
+    """Question wording and options copied from live Greenhouse forms (2026-11-21)."""
+    seed_profile(conn, work_auth=())
+    profile.set_fact(conn, "work_auth/EEA", {"authorised": True, "needs_sponsorship": False}, "confirmed", "user")
+    profile.set_fact(conn, "work_auth/OTHER", {"authorised": False, "needs_sponsorship": True}, "confirmed", "user")
+    profile.set_fact(conn, "contact/location", {"city": "London", "country": "United Kingdom"}, "confirmed", "user")
+    profile.set_fact(conn, "education/uni", {"institution": "Second College", "degree": "MSc Finance", "level": "Master's", "field": "Finance",
+                                             "start": "2099-09", "graduation": "2100-09"}, "confirmed", "cv")
+    A = lambda k, v: answers.set_answer(conn, k, v, source="user")  # noqa: E731
+    A("onsite", "Yes, I'm willing to relocate to the office's location and work on-site || Yes, I'd relocate prior to the start of the role || Yes, I plan to relocate || Yes")
+    A("consent:privacy", "Yes || Opt in || Confirmed")
+    A("demographic:gender", "Woman || Female")
+    A("demographic:orientation", "Bisexual")
+    A("demographic:ethnicity", "I don't wish to answer || Indian || South Asian")
+    A("demographic:veteran", "No, I am not a veteran || I have never served in the military || No")
+    A("demographic:transgender", "I don't wish to answer")
+    A("licenses", "No || N/A || None")
+    A("country", "Norway")
+    A("previously_employed", "No")
+    A("ai_use", "I design or automate workflows with AI tools (e.g., building agents, integrating AI into team processes). || I build AI agents.")
+    A("q:describe yourself", "Direct and precise \u2014 I measure results.")
+    opt = lambda *l: [{"label": x, "value": i} for i, x in enumerate(l)]  # noqa: E731
+    yn = opt("Yes", "No")
+    def q(label, options=None, typ="multi_value_single_select", name=None):
+        return {"label": label, "required": True, "description": "", "fields": [{"name": name or "f_" + str(abs(hash(label)) % 10**8), "type": typ, "options": options or []}]}
+    form = {"questions": [
+        q("Preferred Squarepoint Office Location(s)", opt("Bangalore", "Montreal", "Warsaw"), "multi_value_multi_select", "loc"),
+        q("Will you now, or in the future, require work sponsorship for your preferred location by the Company?", yn, name="spons"),
+        q("Current Visa Status", opt("Hong Kong Citizen", "Hong Kong PR", "Would require visa sponsorship"), name="visa"),
+        q("Are you available to work from our office? (4x a week in Pinheiros, S\u00e3o Paulo)", opt(
+            "Yes, available for on-site work and looking for more face to face time with the team",
+            "Yes, I\u2019m willing to relocate to the office\u2019s location and work on-site", "No, I\u2019m only looking for a remote role or not willing to relocate."), name="onsite"),
+        q("Hybrid work policy", opt("I acknowledge GoCardless's approach to hybrid work."), name="hyb"),
+        q("Your privacy at GoCardless", opt("I understand"), name="priv"),
+        q("Have you worked for Carta at any other time previously?", yn, name="carta"),
+        q("Have you ever worked for Robinhood as an employee, intern or contractor?", opt("I currently work at Robinhood as a full-time employee or intern",
+            "I have never worked at Robinhood"), name="rh"),
+        q("What FINRA license(s), if any, do you currently hold?", opt("N/A", "Series 7 (S7)"), "multi_value_multi_select", "finra"),
+        q("Country", opt("United States of America", "Norway"), name="country"),
+        q("What is your expected graduation date?", opt("Fall 2099", "Fall 2100", "Winter 2101"), name="grad"),
+        q("Is your graduation date expected to be between Aug 2100 and December 2101?", yn, name="gradrange"),
+        q("Which of the following best describes how you use AI tools today?", opt("I do not use AI tools for my work but I am not against it.",
+            "I design or automate workflows with AI tools (e.g., building agents, integrating AI into team processes)."), name="ai"),
+        q("Location of your University", opt("Australia", "Singapore", "Others"), name="uniloc"),
+        q("Describe yourself", typ="textarea", name="desc"),
+        q("Today's Date of Application (MM/DD/YY Format)", typ="input_text", name="date")],
+        "demographic": [
+            {"id": 1, "label": "I identify my gender as:", "required": True, "options": opt("Man", "Woman", "I don't wish to answer")},
+            {"id": 2, "label": "I identify as:", "required": True, "options": opt("Cisgender", "Transgender", "I don't wish to answer")},
+            {"id": 3, "label": "I identify my sexual orientation as:", "required": True, "options": opt("Bisexual", "Straight/Heterosexual", "I don't wish to answer")},
+            {"id": 4, "label": "What is your race or ethnicity?", "required": True, "options": opt("South Asian", "White", "I don't wish to answer")},
+            {"id": 5, "label": "What is your military status?", "required": True, "options": opt("I am on active duty", "I have never served in the military")}]}
+    res = answers.resolve_form(conn, form, {"employer_id": "e"}, {"countries": ["CA", "IN", "PL"]})
+    got = {a["field"]: a["value"] for a in res["answers"]}
+    assert res["missing"] == [], res["missing"]
+    assert got["loc"] == "Warsaw" and got["spons"] == "No"                      # visa-free location first, sponsorship follows it
+    assert got["visa"] == "Would require visa sponsorship" or res["selected_location"] == "Warsaw"
+    assert got["onsite"].startswith("Yes, I\u2019m willing to relocate")
+    assert got["hyb"].startswith("I acknowledge") and got["priv"] == "I understand"
+    assert got["carta"] == "No" and got["rh"] == "I have never worked at Robinhood" and got["finra"] == "N/A"
+    assert got["country"] == "Norway" and got["grad"] == "Fall 2100" and got["gradrange"] == "Yes"
+    assert got["ai"].startswith("I design or automate") and got["uniloc"] == "Others"
+    assert "\u2014" not in got["desc"] and "\u2013" not in got["desc"]
+    import datetime as dt
+    assert got["date"] == dt.date.today().strftime("%m/%d/%y")
+    assert got["1"] == "Woman" and got["2"] == "I don't wish to answer" and got["3"] == "Bisexual"
+    assert got["4"] == "I don't wish to answer" and got["5"] == "I have never served in the military"
+    # Ethnicity without a decline option falls back to the owner's stated answer.
+    form2 = {"questions": [], "demographic": [{"id": 9, "label": "Ethnicity", "required": True, "options": opt("White", "Asian or Asian British: Indian")}]}
+    assert answers.resolve_form(conn, form2, {"employer_id": "e"}, {"countries": ["FR"]})["answers"][0]["value"] == "Asian or Asian British: Indian"
+
+
+def test_pronouns_lgbtq_and_licence_requirements(conn):
+    seed_profile(conn)
+    answers.set_answer(conn, "demographic:gender", "Woman", source="user")
+    answers.set_answer(conn, "pronouns", "Prefer not to share", source="user")
+    answers.set_answer(conn, "demographic:lgbtq", "No", source="user")
+    opt = lambda *l: [{"label": x, "value": i} for i, x in enumerate(l)]  # noqa: E731
+    form = {"questions": [
+        {"label": "What are your preferred gender pronouns?", "required": True, "description": "", "fields": [{"name": "p", "type": "multi_value_single_select", "options": opt("He/Him/His", "Prefer not to share")}]},
+        {"label": "Do you identify as part of the LGBTQ+ community?", "required": True, "description": "", "fields": [{"name": "l", "type": "multi_value_single_select", "options": opt("Yes", "No", "I don't wish to answer")}]}]}
+    got = {a["field"]: a["value"] for a in answers.resolve_form(conn, form, {"employer_id": "e"}, {"countries": ["NL"]})["answers"]}
+    assert got == {"p": "Prefer not to share", "l": "No"}
+    ev = matching.evaluate(conn, add_vacancy(conn, title="Trading Analyst", sid="lic/1", employer="Broker Co",
+                                             description="Trading desk support. Active FINRA licenses are required for this role."))
+    assert ev["decision"] == "reject" and "securities licence" in ev["rationale"]
+
+
+def test_form_requiring_a_finra_licence_closes_the_application(conn):
+    seed_profile(conn)
+    vid = add_vacancy(conn, title="Trading Specialist", sid="rh/1", employer="Broker Co")
+    matching.evaluate(conn, vid)
+    app = apps.ensure(conn, vid)
+    q = FakeAdapter().form("x/1")["questions"] + [{"label": "Active FINRA licenses are REQUIRED for this role. Do you currently hold any?",
+        "description": "", "required": True, "fields": [{"name": "question_77", "type": "input_text", "options": []}]}]
+    assert apps.prepare(conn, app["id"], FakeAdapter(questions=q))["state"] == "closed"

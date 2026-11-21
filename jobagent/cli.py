@@ -139,6 +139,22 @@ def cmd_status(a):
     print("open tasks:", conn.val("SELECT COUNT(*) FROM user_tasks WHERE status='open'"))
 
 
+def cmd_reprepare(a):
+    """Re-prepare every unfinished agent application (after answers or profile facts change)."""
+    conn = _conn()
+    adapter = get_adapter("greenhouse")
+    pipeline.evaluate_pending(conn)
+    rows = conn.q("SELECT id FROM applications WHERE origin='agent' AND state IN ('evaluated','needs_input','prepared','awaiting_approval','queued')")
+    states = {}
+    for r in rows:
+        try:
+            st = apps.prepare(conn, r["id"], adapter)["state"]
+        except Exception as e:  # noqa: BLE001
+            st = "error:" + type(e).__name__
+        states[st] = states.get(st, 0) + 1
+    print({"re-prepared": len(rows), "states": states, "queued_now": len(apps.queue_eligible(conn))})
+
+
 def cmd_serve(a):
     import uvicorn
     from .web import create_app
@@ -178,6 +194,7 @@ def main(argv=None):
     add("import-applications", cmd_import_applications, ("file", {}), ("--source", {"default": "manual import"}))
     add("discover", cmd_discover, ("--source", {"default": "greenhouse", "choices": sorted(registry())}), ("--boards", {"default": ""}))
     add("run-once", cmd_run_once)
+    add("reprepare", cmd_reprepare)
     add("worker", cmd_worker, ("--interval", {"type": int, "default": 300}))
     add("serve", cmd_serve, ("--host", {"default": "127.0.0.1"}), ("--port", {"type": int, "default": 8787}))
     add("backup", cmd_backup, ("path", {}), ("--portable", {"action": "store_true"}))
