@@ -144,3 +144,23 @@ def current_education(conn: Conn, strict: bool = True, completed: bool = False) 
         today = date.today().strftime("%Y-%m")
         entries = [e for e in entries if str(e.get("graduation") or e.get("end") or "9999") <= today]
     return entries[0] if entries else None
+
+
+def work_auth_fact(conn: Conn, country: str, strict: bool = True) -> tuple[dict | None, str | None]:
+    """Work-authorisation fact for a country -> (fact, key used).
+
+    Order: the country itself; the EEA fact for EEA states (not Liechtenstein, whose residence permits are quota-limited);
+    then 'work_auth/OTHER', the candidate's status in any country not listed. Never guesses.
+    """
+    from . import geo
+
+    keys = [f"work_auth/{country}"]
+    if country in geo.EEA and country != "LI":
+        keys.append("work_auth/EEA")
+    if country not in geo.EEA and country != "CH":
+        keys.append("work_auth/OTHER")
+    for key in keys:
+        fact = get_fact(conn, key, confirmed_only=strict)
+        if fact is not None:
+            return fact, key
+    return None, None

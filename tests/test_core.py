@@ -299,3 +299,35 @@ def test_current_and_completed_degrees_are_told_apart(conn):
     v = {"id": "v", "title": "Analyst", "employer_name": "X"}
     text = documents.compose_cover_letter(conn, v, [])
     assert "I study MSc Finance at Second College" in text and "4.5" not in text
+
+
+def test_norwegian_passport_covers_eea_and_switzerland_only(conn):
+    seed_profile(conn, work_auth=())
+    f = lambda k, v, st="confirmed": profile.set_fact(conn, k, v, st, "test")  # noqa: E731
+    f("work_auth/EEA", {"authorised": True, "needs_sponsorship": False})
+    f("work_auth/CH", {"authorised": True, "needs_sponsorship": False})
+    f("work_auth/OTHER", {"authorised": False, "needs_sponsorship": True}, "unconfirmed")
+    ev = lambda **kw: matching.evaluate(conn, add_vacancy(conn, **kw))  # noqa: E731
+    assert ev(location="Paris", sid="n/1", employer="FR Bank")["decision"] == "auto"
+    assert ev(location="Zurich", sid="n/2", employer="CH Bank")["decision"] == "auto"
+    assert ev(location="Vaduz, Liechtenstein", sid="n/3", employer="LI Bank")["decision"] == "hold"      # quota-limited permits
+    assert ev(location="New York, NY", sid="n/4", employer="US Bank")["decision"] == "hold"             # not yet confirmed
+    f("work_auth/OTHER", {"authorised": False, "needs_sponsorship": True})
+    assert ev(location="Dubai", sid="n/5", employer="AE Bank")["decision"] == "reject"                  # policy: no sponsored roles
+    assert ev(location="Paris", sid="n/6", employer="EU Only Bank",
+              description="AML KYC. Applicants must be EU citizens. Bachelor degree.")["decision"] == "hold"
+    forms = [("Are you legally authorized to work in France?", "Yes"), ("Will you require visa sponsorship to work in France?", "No")]
+    for i, (label, want) in enumerate(forms):
+        form = {"questions": [{"label": label, "required": True, "description": "", "fields": [{"name": f"question_{i}", "type": "multi_value_single_select",
+                "options": [{"label": "Yes", "value": 1}, {"label": "No", "value": 0}]}]}]}
+        got = answers.resolve_form(conn, form, {"employer_id": "e"}, {"countries": ["FR"]})["answers"]
+        assert got[0]["value"] == want
+
+
+def test_multi_country_vacancy_needs_a_selectable_authorised_location(conn):
+    seed_profile(conn, work_auth=())
+    profile.set_fact(conn, "work_auth/EEA", {"authorised": True, "needs_sponsorship": False}, "confirmed", "test")
+    profile.set_fact(conn, "work_auth/OTHER", {"authorised": False, "needs_sponsorship": True}, "confirmed", "test")
+    ev = matching.evaluate(conn, add_vacancy(conn, location="Montreal; Warsaw; Bangalore", sid="m/1", employer="Multi Bank"))
+    assert ev["decision"] == "auto_if_selectable" and ev["detail"]["geo"]["countries"] == ["PL"]
+    assert matching.evaluate(conn, add_vacancy(conn, location="Warsaw; Krakow", sid="m/2", employer="PL Bank"))["decision"] == "auto"

@@ -64,6 +64,10 @@ ADV_DEGREE = re.compile(r"\b(master'?s?|msc|m\.sc|mba|ph\.?d|doctorate|postgradu
                         r"\b(pursuing|enrolled in|studying)\b[^.\n]{0,30}\b(master'?s?|msc|mba|ph\.?d)\b(?![^.\n]{0,25}\b(or|/)\b[^.\n]{0,15}bachelor)", re.I)
 
 
+EU_ONLY = re.compile(r"\b(?:must|need to|have to|required to|only)\b[^.\n]{0,40}\b(?:EU|European Union)\s+(?:citizen|national|passport)|"
+                     r"\b(?:EU|European Union)\s+(?:citizenship|nationality|passport)\s+(?:is\s+)?(?:required|mandatory|needed)", re.I)
+
+
 def _kw(pattern: str) -> re.Pattern:
     return re.compile(rf"(?<![a-z]){re.escape(pattern)}(?![a-z])", re.I)
 
@@ -135,11 +139,11 @@ def work_authorisation(conn: Conn, countries: list[str], description: str, cfg: 
     no_sponsor = bool(NO_SPONSOR.search(description or ""))
     per, ok, unknown = {}, [], []
     for cc in countries:
-        fact = profile.get_fact(conn, f"work_auth/{cc}", confirmed_only=True)
-        key = f"work_auth/{cc}"
-        if fact is None and cc in geo.EEA:
-            fact = profile.get_fact(conn, "work_auth/EEA", confirmed_only=True)
-            key = "work_auth/EEA"
+        fact, key = profile.work_auth_fact(conn, cc)
+        if fact is not None and key == "work_auth/EEA" and EU_ONLY.search(description or ""):
+            per[cc] = {"result": "unknown", "reason": "posting asks for EU citizenship; an EEA passport may not qualify", "evidence": key}
+            unknown.append(cc)
+            continue
         if fact is None:
             per[cc] = {"result": "unknown", "reason": "work authorisation not confirmed"}
             unknown.append(cc)
@@ -184,6 +188,13 @@ def evaluate(conn: Conn, vacancy_id: str, llm=None) -> dict:
     countries = g["countries"] if g["decision"] in ("auto", "auto_if_selectable") else sorted(
         {loc["country"] for loc in g["locations"] if loc["country"]})
     auth = work_authorisation(conn, countries, desc, cfg["eligibility"])
+    ok_countries = auth.get("ok") or []
+    if ok_countries and g["decision"] in ("auto", "auto_if_selectable"):
+        # Only the countries where the candidate may work count; with several listed places a location must be chosen explicitly.
+        if g["decision"] == "auto" and len(g["locations"]) > 1 and set(ok_countries) < set(countries):
+            g = {**g, "decision": "auto_if_selectable",
+                 "reasons": g["reasons"] + ["authorised to work in only some of the listed countries: an eligible location must be selected"]}
+        g = {**g, "countries": ok_countries}
     edu = {"result": "fail", "reason": "requires or targets a postgraduate degree"} if ADV_DEGREE.search(title + ". " + desc) and \
         not any("master" in str(f["value"]).lower() or "phd" in str(f["value"]).lower() for f in profile.facts(conn, "education/")) \
         else {"result": "pass", "reason": "no postgraduate requirement found"}

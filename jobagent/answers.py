@@ -156,7 +156,7 @@ def _profile_value(conn: Conn, key: str, country: str | None, employer_id: str, 
         val, src = simple[key]
         return (str(val), f"profile:{src}") if val else (None, None)
     if key.startswith(("work_auth:", "sponsorship:")) and country:
-        fact = get(f"work_auth/{country}") or (get("work_auth/EEA") if country in geo.EEA else None)
+        fact, _ = profile.work_auth_fact(conn, country, strict)
         if fact is not None:
             if key.startswith("work_auth:"):
                 return ("Yes" if fact.get("authorised") else "No"), f"profile:work_auth/{country}"

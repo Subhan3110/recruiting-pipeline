@@ -7,7 +7,7 @@ Last updated: 2026-11-21 (Claude Code, branch `claude/job-agent`, not merged to 
 |---|---|---|
 | Test suite | 74 tests pass on SQLite and on PostgreSQL 16 (local) | `python -m pytest -q`, `JOBAGENT_TEST_PG=...` |
 | Greenhouse discovery | Live: 34 boards, 4,335 vacancies stored and evaluated | `jobs` rows all `done`; `python -m jobagent status` |
-| Matching and geography | Live data after the CV and policy v2: 474 held, 3,861 rejected, 0 automatic (work authorisation unconfirmed) | `evaluations` |
+| Matching and geography | Live data after CV, policy v2 and work authorisation: 33 automatic-eligible, 417 held, 3,861 rejected | `evaluations` |
 | Form filling on a real Greenhouse form | Live dry run with the synthetic test profile: 10 fields incl. dropdowns, CV and letter upload, location. Submit not clicked | attempt outcome `dry_run`, `submit_clicked_at` NULL |
 | Submit, confirmation, security code, ambiguous outcome, recovery | Real Chromium against the local fixture form only | `tests/test_submission.py` |
 | Prior applications | 147 imported from the tracker artifact (63 active, 84 closed); 111 employers hold a used allowance | `applications.origin='imported'`, `employer_slots` |
@@ -26,7 +26,11 @@ Last updated: 2026-11-21 (Claude Code, branch `claude/job-agent`, not merged to 
 - The environment setup script was saved but is unproven until a fresh session starts on the `recruiting-pipeline` environment.
 - Candidate profile: loaded from the owner's CV (2026-11-21), 37 facts, mostly confirmed. Still unconfirmed: current base (London inferred from the MSc),
   POWER job, Econa, Excel/VBA/financial-modelling skills, UK Graduate visa (future). Cover-letter paragraphs (`stories/*`) are **proposed**, so no cover letter is generated until approved.
-- Work authorisation is unknown for every country, so all relevant vacancies are held (474 held, 0 automatic).
+- Work authorisation (2026-11-21): Norwegian passport. Confirmed: EEA states and Switzerland (no visa, sponsorship answered "No"). Liechtenstein is deliberately excluded
+  (quota-limited permits). `work_auth/OTHER` (needs sponsorship everywhere else) is **unconfirmed** until the owner says Norwegian is their only citizenship; policy default is not to apply where sponsorship is needed.
+  Postings that demand "EU citizenship" are held, because an EEA passport may not qualify.
+- Live data now: 33 vacancies at 11 employers are automatic-eligible (EEA and Switzerland); 417 held; 3,861 rejected. A first dry-run preparation showed what forms ask:
+  all 8 prepared applications stop at `needs_input` for standing answers (how heard, age 18, notice period, salary, location, school lists). 3 vacancies were already closed (form 404).
 
 ## Policy change 2026-11-21 (policy v2)
 Owner: applications must be outside Norway and the UK. Implemented as two whole-country excluded areas next to the Oslo and London areas. Such roles stay discoverable and rankable
@@ -35,7 +39,7 @@ Explicit state or country qualifiers now beat place names ("Manchester, NH" is n
 
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.
-2. Citizenship and work authorisation per country, and whether to apply where sponsorship is needed.
+2. Confirm Norwegian is the only citizenship, and whether to apply where sponsorship is needed (non-EEA).
 3. Standing answers: availability, notice period, salary expectations, relocation, LinkedIn URL, demographic-question preference.
 4. Application mailbox choice and read-only access.
 5. Choice of PostgreSQL host for the shared database, then `JOBAGENT_DATABASE_URL` and `JOBAGENT_MASTER_KEY` as secrets in Claude Code and Codex.
