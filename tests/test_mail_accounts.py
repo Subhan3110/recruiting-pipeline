@@ -171,3 +171,19 @@ def test_interactive_blocker_preserves_progress(conn):
     assert conn.one("SELECT 1 FROM user_tasks WHERE kind='manual_action' AND title LIKE 'CAPTCHA%'")
     accounts.mark_verified(conn, acct["id"], "gmail:abc")
     assert accounts.plan(conn, WD, "bankone", ME)["action"] == "login"
+
+
+def test_relay_mailbox_feeds_codes_and_acknowledgements(conn):
+    from jobagent.mail import relay, get_provider
+    db.set_setting(conn, "mail_provider", "relay")
+    box = get_provider(conn)
+    rid = ver.open_request(conn, "application_code", PORTAL, "Fixture Bank", ME, "app_1")
+    assert relay.needs(conn)["verification_codes"][0]["employer_hint"] == "Fixture Bank"
+    out = relay.add(conn, [
+        {"ref": "g1", "received_at": at(2), "sender": "Greenhouse <no-reply@us.greenhouse-mail.io>", "recipients": [ME],
+         "subject": "Security code for your application to Fixture Bank", "text": "Your security code is: QW12ER34"},
+        {"ref": "g1", "received_at": at(2), "sender": "no-reply@us.greenhouse-mail.io", "recipients": [ME], "subject": "dup", "text": ""},
+        {"ref": "bad", "received_at": at(2), "sender": "nobody", "recipients": [], "subject": "x", "text": "x"}])
+    assert out == {"added": 1, "skipped": 1}
+    assert ver.poll(conn, box, rid, DOMAINS, HOSTS)["code"] == "QW12ER34"
+    assert "relayed messages" in box.check()

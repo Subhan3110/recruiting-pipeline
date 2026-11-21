@@ -68,6 +68,10 @@ def get_provider(conn) -> MailProvider | None:
         from .gmail_api import GmailApi
 
         return GmailApi(conn)
+    if kind == "relay":
+        from .relay import RelayMail
+
+        return RelayMail(conn)
     if kind == "imap":
         from .imap import ImapMail
 

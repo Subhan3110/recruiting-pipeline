@@ -30,7 +30,7 @@ CODE_LINE = re.compile(r"(?m)^\s*((?=[A-Za-z0-9]*\d)[A-Z0-9]{6,10}|\d{4,8})\s*$"
 URL = re.compile(r"https?://[^\s\"'<>)\]]+")
 VERIFY_PATH = re.compile(r"(?i)verif|confirm|activat|validat|token|registration")
 ACK = re.compile(r"(?i)thank you for (applying|your application|your interest)|application (has been |was )?(received|submitted)|"
-                 r"(we|we've|we have) received your application|takk for (din |)søknad(en)?|vi har mottatt (din )?søknad|successfully applied")
+                 r"(we|we've|we have|we\u2019ve) received your application|application received|takk for (din |)søknad(en)?|vi har mottatt (din )?søknad|successfully applied")
 
 
 def _iso(dt: datetime) -> str:

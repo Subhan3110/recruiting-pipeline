@@ -66,6 +66,11 @@ and never writes em or en dashes in free text. Questions asking for longer text 
 licence close the application. Sandbox check against the live forms of the 33 unfinished applications: 1 left needing input (a flagged long answer), the rest prepared or queued.
 Next on the Mac: `git pull`, `profile-import` the answers file, `python -m jobagent reprepare`.
 
+## Mail (2026-11-21)
+Owner chose the existing Gmail connector instead of a mailbox password. Added the `relay` provider, `mail-relay-needs` and `mail-relay-add`
+(migration 002) and `docs/MAIL_RELAY.md`. Verified from the cloud session that the connector returns real Greenhouse acknowledgement mails and
+that the acknowledgement wording matches the parser. Not yet run on the Mac against Supabase.
+
 ## Blockers that need the owner
 1. Where you live now (London?), and what your current visa allows while studying.
 2. Compliance answers (PEP, relatives, referral, military, outstanding offers, AI-tool consent) and years of experience.

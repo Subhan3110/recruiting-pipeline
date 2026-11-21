@@ -10,7 +10,7 @@ from .db import Conn, ago, now
 TABLES = ["schema_migrations", "events", "settings", "policy_versions", "profile_facts", "profile_comments", "answers", "user_tasks",
           "employers", "employer_aliases", "vacancies", "vacancy_sources", "evaluations", "documents", "secrets", "accounts",
           "applications", "application_versions", "approvals", "transitions", "attempts", "employer_slots", "verification_requests",
-          "email_messages", "jobs", "model_usage"]
+          "email_messages", "jobs", "model_usage", "mail_relay"]
 
 
 PORTABLE_SKIP = ("documents", "secrets")  # ciphertext is tied to one master key; rebuilt or re-entered on the new database
@@ -65,6 +65,7 @@ def apply_retention(conn: Conn, cfg: dict) -> dict:
     r = cfg["retention"]
     a = conn.q("UPDATE vacancy_sources SET raw=NULL WHERE last_seen < ? AND raw IS NOT NULL RETURNING id", (ago(days=r["vacancy_raw_days"]),))
     b = conn.q("DELETE FROM email_messages WHERE created_at < ? RETURNING id", (ago(days=r["email_evidence_days"]),))
+    conn.q("DELETE FROM mail_relay WHERE created_at < ?", (ago(days=14),))
     c = conn.q("DELETE FROM jobs WHERE status IN ('done','failed') AND finished_at < ? RETURNING id", (ago(days=30),))
     return {"vacancy_raw_cleared": len(a), "email_evidence_deleted": len(b), "jobs_deleted": len(c)}
 
@@ -76,7 +77,7 @@ def delete_personal_data(conn: Conn, confirm: str) -> dict:
     out = {}
     with conn.tx(lock="submission"):
         dbmod.set_setting(conn, "global_pause", True, actor="system")
-        for t in ("profile_facts", "profile_comments", "answers", "secrets", "email_messages", "verification_requests", "documents",
+        for t in ("profile_facts", "profile_comments", "answers", "secrets", "email_messages", "verification_requests", "documents", "mail_relay",
                   "application_versions"):
             out[t] = len(conn.q(f"DELETE FROM {t} RETURNING 1 AS x"))
         conn.q("UPDATE accounts SET credential_ref=NULL, status='deleted', updated_at=?", (now(),))

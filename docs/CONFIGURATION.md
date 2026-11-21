@@ -33,6 +33,7 @@ Scopes are enforced: a `mailbox` secret cannot be read for account creation.
 | `account/<id>` | recruitment | Generated per-account passwords (created by the agent) |
 
 ## Mailbox
+Current choice: the **relay** provider fed from the owner's Gmail connector, see `MAIL_RELAY.md`. The options below need a password or OAuth token instead.
 Prefer a dedicated application mailbox or alias. Set `contact/application_email` in the profile to use it on forms.
 - **Gmail**: `python -m jobagent set mail_provider '"gmail_api"'`. Needs an OAuth client and a refresh token for the single scope
   `gmail.readonly`. Gmail has no narrower scope (no per-sender or per-label access), which is the reason for a dedicated mailbox.

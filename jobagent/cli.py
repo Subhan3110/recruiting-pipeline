@@ -156,6 +156,19 @@ def cmd_reprepare(a):
            "tasks_closed": apps.prune_tasks(conn), "tasks_open": conn.val("SELECT COUNT(*) FROM user_tasks WHERE status='open'")})
 
 
+def cmd_mail_relay_add(a):
+    """Store recruitment e-mails relayed from a mail connector (JSON list from a file or stdin)."""
+    from .mail import relay
+    data = json.load(open(a.file, encoding="utf-8") if a.file != "-" else sys.stdin)
+    print(relay.add(_conn(), data if isinstance(data, list) else data.get("messages", []), a.provider))
+
+
+def cmd_mail_relay_needs(a):
+    """Show which codes and acknowledgements the agent is waiting for (no secrets), with a suggested Gmail query."""
+    from .mail import relay
+    print(json.dumps(relay.needs(_conn()), indent=1, default=str))
+
+
 def cmd_serve(a):
     import uvicorn
     from .web import create_app
@@ -196,6 +209,8 @@ def main(argv=None):
     add("discover", cmd_discover, ("--source", {"default": "greenhouse", "choices": sorted(registry())}), ("--boards", {"default": ""}))
     add("run-once", cmd_run_once)
     add("reprepare", cmd_reprepare)
+    add("mail-relay-add", cmd_mail_relay_add, ("file", {"help": "JSON file or - for stdin"}), ("--provider", {"default": "gmail_connector"}))
+    add("mail-relay-needs", cmd_mail_relay_needs)
     add("worker", cmd_worker, ("--interval", {"type": int, "default": 300}))
     add("serve", cmd_serve, ("--host", {"default": "127.0.0.1"}), ("--port", {"type": int, "default": 8787}))
     add("backup", cmd_backup, ("path", {}), ("--portable", {"action": "store_true"}))
